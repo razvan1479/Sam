@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Comenzi</h1>
+{% for group, items in groups %}
+<h3 style="margin-top:22px">{{ group }}</h3>
+<table>
+  <tr><th style="width:230px">Comandă</th><th>Argumente</th><th>Ce face</th></tr>
+  {% for name, args, desc in items %}
+  <tr>
+    <td><code>{{ name }}</code></td>
+    <td class="small">{{ args or "—" }}</td>
+    <td>{{ desc }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endfor %}
+{% endblock %}

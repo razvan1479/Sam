@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sam</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand"><span>Sam</span></div>
+      <nav class="nav">
+        <a href="{{ url_for('overview') }}" class="{{ 'active' if active=='overview' }}">Overview</a>
+        <a href="{{ url_for('announcements') }}" class="{{ 'active' if active=='announcements' }}">Anunțuri</a>
+        <a href="{{ url_for('tickets') }}" class="{{ 'active' if active=='tickets' }}">Tickete</a>
+        <a href="{{ url_for('blacklist') }}" class="{{ 'active' if active=='blacklist' }}">Blacklist</a>
+        <a href="{{ url_for('logs') }}" class="{{ 'active' if active=='logs' }}">Loguri</a>
+        <a href="{{ url_for('commands') }}" class="{{ 'active' if active=='commands' }}">Comenzi</a>
+        <a href="{{ url_for('calendar') }}" class="{{ 'active' if active=='calendar' }}">Calendar</a>
+        <a href="{{ url_for('welcome_page') }}" class="{{ 'active' if active=='welcome' }}">Bun venit</a>
+        <a href="{{ url_for('goodbye_page') }}" class="{{ 'active' if active=='goodbye' }}">Rămas bun</a>
+      </nav>
+    </aside>
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label }}</h1>
+
+<form method="post" action="{{ url_for('greeting_save') }}" class="greeting-form">
+  <input type="hidden" name="kind" value="{{ kind }}">
+
+  <label class="row">
+    <input type="checkbox" name="enabled" {{ 'checked' if cfg.get('enabled') }}>
+    <span>Activat</span>
+  </label>
+
+  <label class="fld">Canal
+    {% if channels %}
+    <select name="channel_id">
+      <option value="">— alege —</option>
+      {% for cid, cname in channels %}
+      <option value="{{ cid }}" {{ 'selected' if cid == cfg.get('channel_id') }}># {{ cname }}</option>
+      {% endfor %}
+    </select>
+    {% else %}
+    <input type="text" name="channel_id" value="{{ cfg.get('channel_id') or '' }}" placeholder="ID canal">
+    {% endif %}
+  </label>
+
+  <label class="fld">Titlu (embed)
+    <input type="text" name="title" value="{{ cfg.get('title') or '' }}" placeholder="👋 Bun venit">
+  </label>
+
+  <label class="fld">Mesaj
+    <textarea name="message" rows="3" placeholder="Bine ai venit, {user}!">{{ cfg.get('message') or '' }}</textarea>
+  </label>
+  <div class="hint">Placeholdere: <code>{user}</code> <code>{username}</code> <code>{server}</code> <code>{count}</code></div>
+
+  <label class="fld">Culoare (embed)
+    <input type="color" name="color" value="{{ cfg.get('color') or '#5865f2' }}">
+  </label>
+
+  <label class="row">
+    <input type="checkbox" name="use_embed" {{ 'checked' if cfg.get('use_embed', True) }}>
+    <span>Trimite ca embed (dezactivat = text simplu)</span>
+  </label>
+
+  <label class="row">
+    <input type="checkbox" name="show_avatar" {{ 'checked' if cfg.get('show_avatar', True) }}>
+    <span>Arată poza de profil</span>
+  </label>
+
+  <button class="btn-accent">Salvează</button>
+</form>
+{% endblock %}

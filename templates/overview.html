@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Overview</h1>
+<div class="cards">
+  <div class="card"><div class="num">{{ stats.ann_total }}</div><div class="label">Anunțuri (total)</div></div>
+  <div class="card"><div class="num">{{ stats.ann_available }}</div><div class="label">Disponibile</div></div>
+  <div class="card"><div class="num">{{ stats.ann_finished }}</div><div class="label">Finalizate</div></div>
+  <div class="card"><div class="num">{{ stats.tickets_total }}</div><div class="label">Tickete (total)</div></div>
+  <div class="card"><div class="num">{{ stats.tickets_open }}</div><div class="label">Tickete active</div></div>
+  <div class="card"><div class="num">{{ stats.reports_confirmed }}/{{ stats.reports_total }}</div><div class="label">Rapoarte confirmate</div></div>
+  <div class="card"><div class="num">{{ stats.blacklisted }}</div><div class="label">Pe blacklist</div></div>
+</div>
+{% endblock %}

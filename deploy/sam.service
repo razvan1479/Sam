@@ -1,0 +1,17 @@
+# Salvează-l ca /etc/systemd/system/sam.service
+# ÎNLOCUIEȘTE „USER" cu utilizatorul tău de pe Oracle (ex. ubuntu / opc).
+[Unit]
+Description=Sam Discord Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=USER
+WorkingDirectory=/home/USER/Sam
+ExecStart=/home/USER/Sam/.venv/bin/python bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

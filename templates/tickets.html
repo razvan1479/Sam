@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Tickete</h1>
+{% if rows %}
+<table>
+  <tr>
+    <th>ID</th><th>Anunț</th><th>Cumpărător</th><th>Autor</th><th>Status</th><th class="small">Creat</th>
+  </tr>
+  {% for t in rows %}
+  <tr>
+    <td>#{{ t.id }}</td>
+    <td>#{{ t.announcement_id }}</td>
+    <td class="small">{{ t.buyer_id }}</td>
+    <td class="small">{{ t.author_id }}</td>
+    <td>
+      {% if t.status in ['open','accepted'] %}<span class="badge green">{{ t.status }}</span>
+      {% elif t.status == 'finalized' %}<span class="badge grey">finalizat</span>
+      {% else %}<span class="badge red">{{ t.status }}</span>{% endif %}
+    </td>
+    <td class="small">{{ t.created_at|dt }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="empty">Niciun ticket încă.</div>
+{% endif %}
+{% endblock %}

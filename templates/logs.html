@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Loguri</h1>
+{% if rows %}
+<table>
+  <tr><th>Acțiune</th><th>Detalii</th><th class="small">Când</th></tr>
+  {% for l in rows %}
+  <tr>
+    <td>{{ l.action }}</td>
+    <td class="small">{{ l.detail or "—" }}</td>
+    <td class="small">{{ l.created_at|dt }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="empty">Niciun log încă.</div>
+{% endif %}
+{% endblock %}

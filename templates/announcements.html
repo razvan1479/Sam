@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Anunțuri</h1>
+{% if rows %}
+<table>
+  <tr>
+    <th>ID</th><th>Autor</th><th>Din</th><th>În</th><th>Oferă</th><th>Caută</th>
+    <th>Raport</th><th>Status</th><th class="small">Creat</th><th></th>
+  </tr>
+  {% for a in rows %}
+  <tr>
+    <td>#{{ a.id }}</td>
+    <td class="small">{{ a.author_id }}</td>
+    <td>{{ a.server_from or "—" }}</td>
+    <td>{{ a.server_to or "—" }}</td>
+    <td>{{ (a.offer or "—")|truncate(30) }}</td>
+    <td>{{ (a.want or "—")|truncate(30) }}</td>
+    <td>{{ a.ratio or "—" }}</td>
+    <td>
+      {% if a.status == 'available' %}<span class="badge green">Disponibil</span>
+      {% elif a.status == 'finalized' %}<span class="badge grey">Finalizat</span>
+      {% else %}<span class="badge red">Retras</span>{% endif %}
+    </td>
+    <td class="small">{{ a.created_at|dt }}</td>
+    <td>
+      {% if a.status == 'available' %}
+      <form method="post" action="{{ url_for('announcement_delete') }}"
+            onsubmit="return confirm('Ștergi anunțul #{{ a.id }}?');">
+        <input type="hidden" name="ann_id" value="{{ a.id }}">
+        <button class="btn-danger">Șterge</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="empty">Niciun anunț încă.</div>
+{% endif %}
+{% endblock %}

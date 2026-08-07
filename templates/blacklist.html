@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Blacklist</h1>
+
+<form class="addbar" method="post" action="{{ url_for('blacklist_add') }}">
+  <input type="text" name="user_id" placeholder="ID Discord" required>
+  <input type="text" name="reason" placeholder="Motiv (opțional)">
+  <button class="btn-accent">Adaugă</button>
+</form>
+
+{% if rows %}
+<table>
+  <tr><th>Utilizator (ID)</th><th>Motiv</th><th class="small">Adăugat</th><th></th></tr>
+  {% for b in rows %}
+  <tr>
+    <td>{{ b.user_id }}</td>
+    <td>{{ b.reason or "—" }}</td>
+    <td class="small">{{ b.created_at|dt }}</td>
+    <td>
+      <form method="post" action="{{ url_for('blacklist_remove') }}"
+            onsubmit="return confirm('Scoți {{ b.user_id }} de pe blacklist?');">
+        <input type="hidden" name="guild_id" value="{{ b.guild_id }}">
+        <input type="hidden" name="user_id" value="{{ b.user_id }}">
+        <button class="btn-danger">Scoate</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="empty">Nimeni pe blacklist.</div>
+{% endif %}
+{% endblock %}

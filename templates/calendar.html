@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Calendar</h1>
+
+<h3>Setări</h3>
+<form method="post" action="{{ url_for('calendar_settings') }}" class="cal-settings">
+  <label>Canal</label>
+  {% if channels %}
+  <select name="channel_id">
+    {% for cid, cname in channels %}
+    <option value="{{ cid }}" {{ 'selected' if cid == channel_id }}># {{ cname }}</option>
+    {% endfor %}
+  </select>
+  {% else %}
+  <input type="text" name="channel_id" value="{{ channel_id or '' }}" placeholder="ID canal">
+  {% endif %}
+  <label>Ora notificării</label>
+  <input type="text" name="notify_hour" value="{{ notify_hour }}" placeholder="08:00" style="width:90px">
+  <button class="btn-accent">Salvează</button>
+</form>
+
+<h3 style="margin-top:26px">Adaugă eveniment</h3>
+<form method="post" action="{{ url_for('calendar_event_add') }}" class="cal-add">
+  <input type="date" name="date" required>
+  <input type="text" name="time" placeholder="HH:MM (opțional)" style="width:130px">
+  <input type="text" name="description" placeholder="Descriere" required style="flex:1">
+  <button class="btn-accent">Adaugă</button>
+</form>
+
+<h3 style="margin-top:26px">Evenimente</h3>
+{% if events %}
+<table>
+  <tr><th>ID</th><th>Data</th><th>Ora</th><th>Descriere</th><th></th></tr>
+  {% for e in events %}
+  <tr>
+    <td>#{{ e.id }}</td>
+    <td>{{ e.date }}</td>
+    <td>{{ e.time or "—" }}</td>
+    <td>{{ e.description }}</td>
+    <td>
+      <form method="post" action="{{ url_for('calendar_event_delete') }}"
+            onsubmit="return confirm('Ștergi evenimentul #{{ e.id }}?');">
+        <input type="hidden" name="event_id" value="{{ e.id }}">
+        <button class="btn-danger">Șterge</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="empty">Niciun eveniment.</div>
+{% endif %}
+{% endblock %}
