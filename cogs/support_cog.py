@@ -1,5 +1,5 @@
-# cogs/support_cog.py — tichete de SUPORT / CERERE, separate de marketplace.
-# Panou cu două butoane (Suport / Cerere) → creează tichet privat în categoria de suport,
+# cogs/support_cog.py — tichete de SUPORT / CERERE GRAD, separate de marketplace.
+# Panou cu două butoane (Suport / Cerere GRAD) → creează tichet privat în categoria de suport,
 # vizibil pentru user + rolul de suport. NU e anonim (e suport normal).
 
 import asyncio
@@ -27,7 +27,7 @@ class OpenSupportButton(discord.ui.DynamicItem[discord.ui.Button],
                         template=config.CID_SUPPORT_OPEN + r":(?P<kind>[a-z]+)"):
     def __init__(self, kind: str):
         self.kind = kind
-        label = config.SUPPORT_BTN_SUPORT if kind == "suport" else config.SUPPORT_BTN_CERERE
+        label = config.SUPPORT_BTN_SUPORT if kind == "suport" else config.SUPPORT_BTN_CERERE_GRAD
         style = discord.ButtonStyle.primary if kind == "suport" else discord.ButtonStyle.secondary
         super().__init__(discord.ui.Button(label=label, style=style,
                                            custom_id=f"{config.CID_SUPPORT_OPEN}:{kind}"))
@@ -109,7 +109,7 @@ class CloseSupportButton(discord.ui.DynamicItem[discord.ui.Button],
 def make_panel_view() -> discord.ui.View:
     view = discord.ui.View(timeout=None)
     view.add_item(OpenSupportButton("suport"))
-    view.add_item(OpenSupportButton("cerere"))
+    view.add_item(OpenSupportButton("cerere grad"))
     return view
 
 
@@ -136,7 +136,7 @@ class Support(commands.Cog):
         store.set_guild_value(channel.guild.id, "support_panel_message_id", msg.id)
 
     group = app_commands.Group(
-        name="support", description="Tichete de suport / cerere",
+        name="support", description="Tichete de suport / cerere grad",
         default_permissions=discord.Permissions(administrator=True),
     )
 
