@@ -3,19 +3,37 @@
 <h1>Calendar</h1>
 
 <h3>Setări</h3>
-<form method="post" action="{{ url_for('calendar_settings') }}" class="cal-settings">
-  <label>Canal</label>
-  {% if channels %}
-  <select name="channel_id">
-    {% for cid, cname in channels %}
-    <option value="{{ cid }}" {{ 'selected' if cid == channel_id }}># {{ cname }}</option>
-    {% endfor %}
-  </select>
-  {% else %}
-  <input type="text" name="channel_id" value="{{ channel_id or '' }}" placeholder="ID canal">
-  {% endif %}
-  <label>Ora notificării</label>
-  <input type="text" name="notify_hour" value="{{ notify_hour }}" placeholder="08:00" style="width:90px">
+<form method="post" action="{{ url_for('calendar_settings') }}">
+  <div class="cal-settings">
+    <label>Canal</label>
+    {% if channels %}
+    <select name="channel_id">
+      {% for cid, cname in channels %}
+      <option value="{{ cid }}" {{ 'selected' if cid == channel_id }}># {{ cname }}</option>
+      {% endfor %}
+    </select>
+    {% else %}
+    <input type="text" name="channel_id" value="{{ channel_id or '' }}" placeholder="ID canal">
+    {% endif %}
+    <label>Ora notificării</label>
+    <input type="text" name="notify_hour" value="{{ notify_hour }}" placeholder="08:00" style="width:90px">
+  </div>
+
+  <div class="cal-texts">
+    <label class="fld">Titlu secțiune „azi"
+      <input type="text" name="today_label" value="{{ today_label }}">
+    </label>
+    <label class="fld">Titlu secțiune „următoarele"
+      <input type="text" name="upcoming_label" value="{{ upcoming_label }}">
+    </label>
+    <label class="fld">Text când nu există evenimente
+      <input type="text" name="empty_label" value="{{ empty_label }}">
+    </label>
+    <label class="fld">Titlu notificare @everyone
+      <input type="text" name="notify_header" value="{{ notify_header }}">
+    </label>
+  </div>
+
   <button class="btn-accent">Salvează</button>
 </form>
 

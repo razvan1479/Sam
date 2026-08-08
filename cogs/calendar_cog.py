@@ -10,6 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+import config
 import db
 import store
 
@@ -28,19 +29,21 @@ MONTHS_RO_SHORT = ["Ian", "Feb", "Mar", "Apr", "Mai", "Iun",
 # =========================================================
 
 def build_calendar_text(year: int, month: int, highlight_day: int) -> str:
-    """Grila lunii, cu ziua curentă în [paranteze]. Se afișează într-un bloc de cod (monospace)."""
+    """Grila lunii, aliniată pe coloane fixe (fiecare căsuță are 4 caractere).
+    Ziua curentă e în [paranteze]. Se afișează într-un bloc de cod (monospace)."""
     weeks = pycalendar.Calendar(firstweekday=0).monthdayscalendar(year, month)
-    lines = [WEEK_HEADER]
+    header = "".join(d.rjust(4) for d in ["L", "M", "M", "J", "V", "S", "D"])
+    lines = [header]
     for week in weeks:
         cells = []
         for d in week:
             if d == 0:
-                cells.append("  ")            # zi din afara lunii
+                cells.append(" " * 4)                 # zi din afara lunii
             elif d == highlight_day:
-                cells.append(f"[{d}]")        # ziua curentă
+                cells.append(f"[{d}]".rjust(4))        # ziua curentă
             else:
-                cells.append(f"{d:2d}")
-        lines.append(" ".join(cells))
+                cells.append(str(d).rjust(4))
+        lines.append("".join(cells))
     return "\n".join(lines)
 
 
@@ -56,17 +59,29 @@ def _fmt_upcoming(e: dict) -> str:
     return f"{int(d):02d} {MONTHS_RO_SHORT[int(m) - 1]} • {e['description']}"
 
 
+def _cal_texts(guild_id: int) -> dict:
+    """Textele calendarului (din setări, cu valorile implicite ca rezervă)."""
+    s = store.get_guild(guild_id)
+    return {
+        "today":    s.get("cal_today_label") or config.CAL_TODAY_LABEL,
+        "upcoming": s.get("cal_upcoming_label") or config.CAL_UPCOMING_LABEL,
+        "empty":    s.get("cal_empty_label") or config.CAL_EMPTY_LABEL,
+        "notify":   s.get("cal_notify_header") or config.CAL_NOTIFY_HEADER,
+    }
+
+
 def build_events_section(guild_id: int, today: str) -> str:
+    t = _cal_texts(guild_id)
     today_events = db.events_on(guild_id, today)
     upcoming = db.upcoming_events(guild_id, today)
 
     parts = []
     if today_events:
-        parts.append("📍 **Astăzi**\n" + "\n".join(_fmt_today(e) for e in today_events))
+        parts.append(f"**{t['today']}**\n" + "\n".join(_fmt_today(e) for e in today_events))
     if upcoming:
-        parts.append("📌 **Următoarele evenimente**\n" + "\n".join(_fmt_upcoming(e) for e in upcoming))
+        parts.append(f"**{t['upcoming']}**\n" + "\n".join(_fmt_upcoming(e) for e in upcoming))
     if not today_events and not upcoming:
-        parts.append("✅ Nu există evenimente programate.")
+        parts.append(t["empty"])
     return "\n\n".join(parts)
 
 
@@ -78,8 +93,9 @@ def build_full_content(guild_id: int, now: datetime) -> str:
 
 
 def build_notification(guild_id: int, today: str) -> str:
+    t = _cal_texts(guild_id)
     lines = "\n".join(_fmt_today(e) for e in db.events_on(guild_id, today))
-    return f"@everyone\n\n📅 **Evenimentele de astăzi**\n\n{lines}"
+    return f"@everyone\n\n**{t['notify']}**\n\n{lines}"
 
 
 # =========================================================

@@ -238,3 +238,12 @@ LOG_ANN_WITHDRAWN = "🗑️ Anunț retras"
 ANN_DIVIDER = "\u2500" * 20
 
 RELAY_SELLER_NAME = "Vânzător (anonim)"
+
+
+# =========================================================
+#  Texte calendar (configurabile din dashboard)
+# =========================================================
+CAL_TODAY_LABEL    = "📍 Astăzi"
+CAL_UPCOMING_LABEL = "📌 Următoarele evenimente"
+CAL_EMPTY_LABEL    = "✅ Nu există evenimente programate."
+CAL_NOTIFY_HEADER  = "📅 Evenimentele de astăzi"

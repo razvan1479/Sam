@@ -10,6 +10,7 @@ from flask import Flask, render_template, request, redirect, url_for
 
 import db
 import store
+import config
 
 app = Flask(__name__)
 
@@ -127,6 +128,10 @@ def calendar():
     return render_template(
         "calendar.html", active="calendar", events=events, channels=channels,
         channel_id=s.get("calendar_channel_id"), notify_hour=s.get("notify_hour", "08:00"),
+        today_label=s.get("cal_today_label") or config.CAL_TODAY_LABEL,
+        upcoming_label=s.get("cal_upcoming_label") or config.CAL_UPCOMING_LABEL,
+        empty_label=s.get("cal_empty_label") or config.CAL_EMPTY_LABEL,
+        notify_header=s.get("cal_notify_header") or config.CAL_NOTIFY_HEADER,
     )
 
 
@@ -144,6 +149,13 @@ def calendar_settings():
         _refresh_calendar(gid)
     if hour and _valid_hhmm(hour):
         store.set_guild_value(gid, "notify_hour", hour)
+    # texte configurabile
+    for key, field in [("cal_today_label", "today_label"),
+                       ("cal_upcoming_label", "upcoming_label"),
+                       ("cal_empty_label", "empty_label"),
+                       ("cal_notify_header", "notify_header")]:
+        store.set_guild_value(gid, key, request.form.get(field, "").strip() or None)
+    _refresh_calendar(gid)
     return redirect(url_for("calendar"))
 
 
