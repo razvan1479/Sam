@@ -260,3 +260,5 @@ LOG_KEEP_DAYS = 30
 
 # Aceste acțiuni NU se șterg NICIODATĂ (istoric permanent). Curățarea le sare.
 LOG_PROTECTED = [LOG_FINALIZED]
+
+MSG_FINALIZE_DM = "🤝 Tranzacția pentru anunțul **#{ann_id}** a fost **finalizată** de intermediar. Mulțumim! Conversația din DM a fost ștearsă."

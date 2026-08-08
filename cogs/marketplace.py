@@ -703,7 +703,41 @@ class FinalizeButton(discord.ui.DynamicItem[discord.ui.Button],
         except discord.HTTPException:
             pass
         asyncio.create_task(_close_channel_later(channel, config.TICKET_CLOSE_DELAY))
+
+        # 6) anunțăm ambele părți în DM + curățăm mesajele releu din DM-urile lor
+        asyncio.create_task(_finalize_notify_and_clean(interaction.client, ticket["buyer_id"], ann_id))
+        asyncio.create_task(_finalize_notify_and_clean(interaction.client, ticket["author_id"], ann_id))
+
         await interaction.followup.send("✅ Gata.", ephemeral=True)
+
+
+async def _finalize_notify_and_clean(client, user_id, ann_id):
+    """La finalizare: șterge mesajele releu trimise de bot în DM-ul userului,
+    apoi îi trimite anunțul de finalizare (care rămâne)."""
+    if not user_id:
+        return
+    user = client.get_user(user_id)
+    if user is None:
+        try:
+            user = await client.fetch_user(user_id)
+        except discord.NotFound:
+            return
+    # curăță mesajele pe care botul le-a trimis în acest DM (nu poate șterge ce a scris userul)
+    try:
+        dm = user.dm_channel or await user.create_dm()
+        old = [m async for m in dm.history(limit=100) if m.author.id == client.user.id]
+        for m in old:
+            try:
+                await m.delete()
+            except discord.HTTPException:
+                pass
+    except discord.HTTPException:
+        pass
+    # anunțul de finalizare (rămâne)
+    try:
+        await user.send(config.MSG_FINALIZE_DM.format(ann_id=ann_id))
+    except discord.HTTPException:
+        pass
 
 
 def make_finalize_view(ticket_id: int) -> discord.ui.View:
