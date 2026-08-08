@@ -23,6 +23,11 @@
     <button class="btn-danger">Reset tickete</button>
     <span>Șterge doar ticketele. Anunțurile și jucătorii rămân.</span>
   </form>
+  <form method="post" action="{{ url_for('reset_support_route') }}"
+        onsubmit="return confirm('Sigur ștergi TOATE tichetele de suport? Acțiune IREVERSIBILĂ!');">
+    <button class="btn-danger">Reset suport</button>
+    <span>Șterge tichetele de suport/cerere din baza de date.</span>
+  </form>
   <form method="post" action="{{ url_for('reset_players') }}"
         onsubmit="return confirm('Sigur resetezi statisticile TUTUROR jucătorilor? Acțiune IREVERSIBILĂ!');">
     <button class="btn-danger">Reset jucători</button>

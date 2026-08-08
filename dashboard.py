@@ -105,6 +105,34 @@ def tickets_settings():
     return redirect(url_for("tickets"))
 
 
+@app.route("/support")
+def support_page():
+    gid = store.first_guild_id()
+    s = store.get_guild(gid) if gid else {}
+    categories, roles = [], []
+    if bot is not None and gid:
+        g = bot.get_guild(gid)
+        if g:
+            categories = [(c.id, c.name) for c in g.categories]
+            roles = [(r.id, r.name) for r in g.roles if not r.is_default()]
+    return render_template("support.html", active="support",
+                           rows=db.list_support_tickets(gid) if gid else [],
+                           categories=categories, roles=roles,
+                           support_category_id=s.get("support_category_id"),
+                           support_role_id=s.get("support_role_id"))
+
+
+@app.route("/support/settings", methods=["POST"])
+def support_settings():
+    gid = store.first_guild_id()
+    if gid:
+        cat = request.form.get("category_id", "").strip()
+        role = request.form.get("role_id", "").strip()
+        store.set_guild_value(gid, "support_category_id", int(cat) if cat.isdigit() else None)
+        store.set_guild_value(gid, "support_role_id", int(role) if role.isdigit() else None)
+    return redirect(url_for("support_page"))
+
+
 @app.route("/blacklist")
 def blacklist():
     return render_template("blacklist.html", rows=db.list_blacklist(), active="blacklist")
@@ -141,6 +169,10 @@ COMMANDS = [
         ("/promoter add", "membru", "Adaugă un promoter: creează canal privat, dă rolul și îl bagă în clasament."),
         ("/promoter remove", "membru", "Scoate un promoter: șterge canalul și rolul."),
         ("/promoter regenereaza", "", "Repostează clasamentul."),
+    ]),
+    ("Suport / Cereri (admin)", [
+        ("/support setup", "canal rol categorie", "Configurează suportul și postează panoul (Suport / Cerere)."),
+        ("/support panel", "", "Repostează panoul de suport."),
     ]),
     ("Bun venit / Rămas bun", [
         ("(fără comenzi)", "", "Se configurează din paginile Bun venit și Rămas bun ale dashboard-ului."),
@@ -323,6 +355,14 @@ def reset_tickets_route():
     gid = store.first_guild_id()
     if gid:
         db.reset_tickets(gid)
+    return redirect(url_for("overview"))
+
+
+@app.route("/reset/support", methods=["POST"])
+def reset_support_route():
+    gid = store.first_guild_id()
+    if gid:
+        db.reset_support_tickets(gid)
     return redirect(url_for("overview"))
 
 

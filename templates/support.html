@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Suport & Cereri</h1>
+
+<h3>Setări</h3>
+<form method="post" action="{{ url_for('support_settings') }}" class="cal-settings">
+  <label>Categorie</label>
+  {% if categories %}
+  <select name="category_id">
+    <option value="">— alege —</option>
+    {% for cid, cname in categories %}
+    <option value="{{ cid }}" {{ 'selected' if cid == support_category_id }}>{{ cname }}</option>
+    {% endfor %}
+  </select>
+  {% else %}
+  <input type="text" name="category_id" value="{{ support_category_id or '' }}" placeholder="ID categorie">
+  {% endif %}
+  <label>Rol suport</label>
+  {% if roles %}
+  <select name="role_id">
+    <option value="">— alege —</option>
+    {% for rid, rname in roles %}
+    <option value="{{ rid }}" {{ 'selected' if rid == support_role_id }}>{{ rname }}</option>
+    {% endfor %}
+  </select>
+  {% else %}
+  <input type="text" name="role_id" value="{{ support_role_id or '' }}" placeholder="ID rol">
+  {% endif %}
+  <button class="btn-accent">Salvează</button>
+</form>
+<p class="hint">Panoul se postează cu <code>/support setup</code>. Tichetele noi se creează în categoria aleasă.</p>
+
+<h3 style="margin-top:24px">Tichete</h3>
+{% if rows %}
+<table>
+  <tr><th>ID</th><th>User</th><th>Tip</th><th>Status</th><th class="small">Creat</th></tr>
+  {% for t in rows %}
+  <tr>
+    <td>#{{ t.id }}</td>
+    <td class="small">{{ t.user_id }}</td>
+    <td>{{ t.kind }}</td>
+    <td>
+      {% if t.status == 'open' %}<span class="badge green">deschis</span>
+      {% else %}<span class="badge grey">închis</span>{% endif %}
+    </td>
+    <td class="small">{{ t.created_at|dt }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="empty">Niciun tichet de suport.</div>
+{% endif %}
+{% endblock %}

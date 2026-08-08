@@ -29,6 +29,7 @@ class SamBot(commands.Bot):
         await self.load_extension("cogs.calendar_cog")
         await self.load_extension("cogs.welcome_cog")
         await self.load_extension("cogs.leaderboard_cog")
+        await self.load_extension("cogs.support_cog")
 
         if GUILD_ID:
             # sincronizare pe un singur server → comenzile apar imediat (ideal pentru test)

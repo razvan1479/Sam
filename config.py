@@ -264,3 +264,23 @@ LOG_PROTECTED = [LOG_FINALIZED]
 MSG_FINALIZE_DM = "🤝 Tranzacția pentru anunțul **#{ann_id}** a fost **finalizată** de intermediar. Mulțumim! Conversația din DM a fost ștearsă."
 
 DM_ANON_NOTE = "🕵️ Cineva e interesat de anunțul tău și rămâne **anonim**. Vezi doar reputația lui:"
+
+
+# =========================================================
+#  Suport / Cereri (tichete separate de market)
+# =========================================================
+CID_SUPPORT_OPEN  = "sup:open"
+CID_SUPPORT_CLOSE = "sup:close"
+
+SUPPORT_PANEL_TITLE = "🎫 Suport & Cereri"
+SUPPORT_PANEL_DESC  = "Ai o problemă sau o cerere? Deschide un tichet privat — echipa te va ajuta."
+SUPPORT_BTN_SUPORT  = "🛠️ Suport"
+SUPPORT_BTN_CERERE  = "📩 Cerere"
+SUPPORT_BTN_CLOSE   = "🔒 Închide tichetul"
+
+SUPPORT_WELCOME     = "🎫 Tichet de **{kind}** deschis de {user}. {role}\nDescrie pe scurt cu ce te putem ajuta — un membru al echipei va răspunde curând."
+SUPPORT_CLOSING     = "🔒 Tichet închis. Canalul se șterge în câteva secunde."
+SUPPORT_ALREADY_OPEN = "❌ Ai deja un tichet deschis. Închide-l înainte să deschizi altul."
+SUPPORT_CREATED     = "✅ Tichet deschis: {channel}"
+SUPPORT_NO_SETUP    = "❌ Sistemul de suport nu e configurat. Rulează `/support setup`."
+SUPPORT_ONLY_STAFF  = "❌ Doar staff-ul sau cel care a deschis tichetul îl poate închide."

@@ -111,6 +111,16 @@ CREATE TABLE IF NOT EXISTS promoters (
     UNIQUE(guild_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS support_tickets (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id   INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    channel_id INTEGER,
+    kind       TEXT,
+    status     TEXT NOT NULL DEFAULT 'open',
+    created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS promoter_votes (
     promoter_id INTEGER NOT NULL,
     user_id     INTEGER NOT NULL,
@@ -661,3 +671,56 @@ def reset_tickets(guild_id) -> None:
         conn.execute("DELETE FROM tickets WHERE guild_id=?", (guild_id,))
         if conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0] == 0:
             conn.execute("DELETE FROM sqlite_sequence WHERE name='tickets'")
+
+
+# ---------- Tichete de suport / cerere ----------
+
+def create_support_ticket(guild_id, user_id, channel_id, kind) -> int:
+    now = int(time.time())
+    with _connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO support_tickets (guild_id, user_id, channel_id, kind, status, created_at) "
+            "VALUES (?,?,?,?, 'open', ?)",
+            (guild_id, user_id, channel_id, kind, now),
+        )
+        return cur.lastrowid
+
+
+def get_support_ticket_by_channel(channel_id) -> dict | None:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM support_tickets WHERE channel_id=? ORDER BY id DESC LIMIT 1", (channel_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def has_open_support_ticket(guild_id, user_id) -> bool:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM support_tickets WHERE guild_id=? AND user_id=? AND status='open' LIMIT 1",
+            (guild_id, user_id),
+        ).fetchone()
+        return row is not None
+
+
+def set_support_ticket_status(ticket_id, status) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE support_tickets SET status=? WHERE id=?", (status, ticket_id))
+
+
+def list_support_tickets(guild_id=None, limit=200) -> list:
+    with _connect() as conn:
+        if guild_id is None:
+            rows = conn.execute("SELECT * FROM support_tickets ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM support_tickets WHERE guild_id=? ORDER BY id DESC LIMIT ?", (guild_id, limit)
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def reset_support_tickets(guild_id) -> None:
+    with _connect() as conn:
+        conn.execute("DELETE FROM support_tickets WHERE guild_id=?", (guild_id,))
+        if conn.execute("SELECT COUNT(*) FROM support_tickets").fetchone()[0] == 0:
+            conn.execute("DELETE FROM sqlite_sequence WHERE name='support_tickets'")
