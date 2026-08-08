@@ -70,7 +70,8 @@ MSG_NO_INTERMEDIAR     = "⚠️ Adminul nu a configurat încă rolul de interme
 TICKET_NAME    = "ticket-{ann_id}-{user}"   # numele canalului de ticket
 TICKET_WELCOME = (
     "🎟️ Ticket pentru anunțul **#{ann_id}**.\n"
-    "Intermediarul vă va asista pe parcursul schimbului. Vânzătorul a fost anunțat în privat."
+    "🕵️ Discuție **anonimă**: cumpărătorul și vânzătorul scriu din DM și apar aici anonimizați. "
+    "Tu (intermediarul) ești singurul în canal — ce scrii aici ajunge la amândoi în privat."
 )
 TICKET_AUTHOR_NO_DM = (
     "⚠️ Nu am putut trimite notificarea în privat vânzătorului (are DM-urile închise)."
@@ -238,6 +239,12 @@ LOG_ANN_WITHDRAWN = "🗑️ Anunț retras"
 ANN_DIVIDER = "\u2500" * 20
 
 RELAY_SELLER_NAME = "Vânzător (anonim)"
+RELAY_BUYER_NAME  = "Cumpărător (anonim)"
+RELAY_STAFF_NAME  = "🛡️ Intermediar"
+
+MSG_BUYER_RELAY_INFO = "🎟️ Ai deschis o discuție pentru anunțul #{ann_id}. Scrie mesajele **aici, în DM** — apar anonim în ticket și rămâi complet anonim."
+MSG_TICKET_CREATED_ANON = "✅ Discuție anonimă deschisă. Scrie-mi **în DM** — mesajele tale apar anonim în ticket."
+MSG_BUYER_DM_CLOSED = "⚠️ Am deschis discuția, dar ai DM-urile blocate. Activează mesajele private (Setări server → Confidențialitate) ca să poți vorbi anonim."
 
 
 # =========================================================
@@ -250,3 +257,6 @@ CAL_NOTIFY_HEADER  = "📅 Evenimentele de astăzi"
 
 # Câte zile de loguri se păstrează (restul se șterg automat, o dată pe zi)
 LOG_KEEP_DAYS = 30
+
+# Aceste acțiuni NU se șterg NICIODATĂ (istoric permanent). Curățarea le sare.
+LOG_PROTECTED = [LOG_FINALIZED]

@@ -426,12 +426,21 @@ def add_log(guild_id, action, detail=None) -> None:
             (guild_id, action, detail, now),
         )
         # Curățare automată: o singură dată pe zi (la primul log al zilei),
-        # șterge logurile mai vechi de LOG_KEEP_DAYS zile. Fără proces separat.
+        # șterge logurile mai vechi de LOG_KEEP_DAYS zile — DAR păstrează pentru
+        # totdeauna acțiunile din LOG_PROTECTED (ex. schimburile finalizate).
         day = now // 86400
         if _last_prune_day != day:
             _last_prune_day = day
             cutoff = now - config.LOG_KEEP_DAYS * 86400
-            conn.execute("DELETE FROM logs WHERE created_at < ?", (cutoff,))
+            protected = list(config.LOG_PROTECTED or [])
+            if protected:
+                qmarks = ",".join("?" * len(protected))
+                conn.execute(
+                    f"DELETE FROM logs WHERE created_at < ? AND action NOT IN ({qmarks})",
+                    (cutoff, *protected),
+                )
+            else:
+                conn.execute("DELETE FROM logs WHERE created_at < ?", (cutoff,))
 
 
 def list_logs(limit=300) -> list:
@@ -606,5 +615,15 @@ def get_accepted_tickets_for_seller(seller_id) -> list:
         rows = conn.execute(
             "SELECT * FROM tickets WHERE author_id=? AND status='accepted' ORDER BY id DESC",
             (seller_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_active_tickets_for_buyer(buyer_id) -> list:
+    """Ticketele active (deschise sau acceptate) în care userul e cumpărător."""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM tickets WHERE buyer_id=? AND status IN ('open','accepted') ORDER BY id DESC",
+            (buyer_id,),
         ).fetchall()
     return [dict(r) for r in rows]

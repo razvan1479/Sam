@@ -61,6 +61,14 @@ def build_announcement_embed(ann: dict) -> discord.Embed:
     return embed
 
 
+def _relay_body(message: discord.Message) -> str:
+    """Textul unui mesaj + link-urile atașamentelor (CDN-ul nu dezvăluie identitatea)."""
+    body = (message.content or "").strip()
+    if message.attachments:
+        body = (body + "\n" + "\n".join(a.url for a in message.attachments)).strip()
+    return body
+
+
 def build_dm_embed(buyer, ann_id: int, ticket_id: int, stats: dict) -> discord.Embed:
     """Embed-ul trimis autorului în privat când cineva îi contactează anunțul."""
     e = discord.Embed(title=config.DM_TITLE.format(ann_id=ann_id), color=config.COLOR_INFO)
@@ -207,11 +215,10 @@ class ContactButton(discord.ui.DynamicItem[discord.ui.Button],
         category = guild.get_channel(g["ticket_category_id"]) if g.get("ticket_category_id") else None
 
         # --- permisiunile canalului de ticket ---
-        # @everyone nu vede; cumpărătorul, intermediarul și botul văd. Autorul NU e adăugat.
+        # DOAR intermediarul + botul văd ticketul. Cumpărătorul ȘI autorul vorbesc
+        # din DM (releu anonim) — niciunul nu e adăugat în canal.
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
-            buyer: discord.PermissionOverwrite(
-                view_channel=True, send_messages=True, read_message_history=True),
             guild.me: discord.PermissionOverwrite(
                 view_channel=True, send_messages=True, read_message_history=True, manage_channels=True),
         }
@@ -234,9 +241,9 @@ class ContactButton(discord.ui.DynamicItem[discord.ui.Button],
         ticket_id = db.create_ticket(guild.id, self.ann_id, buyer.id, author_id, channel.id)
         _contact_cd[buyer.id] = time.time()   # pornim cooldown-ul după o creare reușită
 
-        # --- mesaj de deschidere în ticket ---
-        ping = buyer.mention + (f" {inter_role.mention}" if inter_role else "")
-        await channel.send(f"{ping}\n{config.TICKET_WELCOME.format(ann_id=self.ann_id)}")
+        # --- mesaj de deschidere în ticket (doar intermediarul e pingat) ---
+        ping = inter_role.mention if inter_role else ""
+        await channel.send((ping + "\n" if ping else "") + config.TICKET_WELCOME.format(ann_id=self.ann_id))
         await channel.send(config.TICKET_CONTROLS_HINT, view=make_ticket_controls_view(ticket_id))
 
         # --- DM către autor ---
@@ -264,8 +271,15 @@ class ContactButton(discord.ui.DynamicItem[discord.ui.Button],
         await log_action(guild, config.LOG_TICKET_OPEN,
                          {"Ticket": f"#{ticket_id}", "Anunț": f"#{self.ann_id}", "Cumpărător": buyer.mention})
 
+        # --- DM de instrucțiuni către cumpărător (releu anonim) ---
+        buyer_dm_ok = True
+        try:
+            await buyer.send(config.MSG_BUYER_RELAY_INFO.format(ann_id=self.ann_id))
+        except discord.Forbidden:
+            buyer_dm_ok = False
+
         # --- confirmare către cumpărător ---
-        msg = config.MSG_TICKET_CREATED.format(channel=channel.mention)
+        msg = config.MSG_TICKET_CREATED_ANON if buyer_dm_ok else config.MSG_BUYER_DM_CLOSED
         if inter_role is None:
             msg += "\n" + config.MSG_NO_INTERMEDIAR
         await interaction.followup.send(msg, ephemeral=True)
@@ -1154,67 +1168,84 @@ class Marketplace(commands.Cog):
             await interaction.followup.send(f"❌ Reîncărcare eșuată: {e}", ephemeral=True)
 
     # =========================================================
-    #  RELEU ANONIM: DM vânzător <-> ticket
+    #  RELEU ANONIM (cameră): cumpărător ↔ vânzător ↔ intermediar
+    #  Cumpărătorul și vânzătorul vorbesc din DM; doar intermediarul e în ticket.
+    #  Cumpărătorul și vânzătorul rămân anonimi unul față de celălalt.
     # =========================================================
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
-        # DM de la vânzător → îl punem anonim în ticket
         if message.guild is None:
-            await self._relay_from_seller(message)
-            return
-        # mesaj într-un canal de ticket acceptat → îl trimitem vânzătorului în DM
-        if not message.channel.name.startswith("ticket-"):
-            return
-        ticket = db.get_ticket_by_channel(message.channel.id)
-        if ticket and ticket["status"] == "accepted" and message.author.id != ticket["author_id"]:
-            await self._relay_to_seller(message, ticket)
+            await self._relay_from_dm(message)
+        elif message.channel.name.startswith("ticket-"):
+            await self._relay_from_ticket(message)
 
-    async def _relay_from_seller(self, message: discord.Message):
-        tickets = db.get_accepted_tickets_for_seller(message.author.id)
-        if not tickets:
+    def _find_relay_ticket(self, user_id):
+        """Cel mai recent ticket activ în care userul e cumpărător sau vânzător."""
+        candidates = [(t, "seller") for t in db.get_accepted_tickets_for_seller(user_id)]
+        candidates += [(t, "buyer") for t in db.get_active_tickets_for_buyer(user_id)]
+        if not candidates:
+            return None, None
+        candidates.sort(key=lambda tr: tr[0]["id"], reverse=True)
+        return candidates[0]
+
+    async def _dm_user(self, user_id, content):
+        if not user_id:
             return
-        ticket = tickets[0]   # cea mai recentă conversație acceptată
-        guild = self.bot.get_guild(ticket["guild_id"])
-        channel = guild.get_channel(ticket["channel_id"]) if guild else None
-        if channel is None:
+        user = self.bot.get_user(user_id)
+        if user is None:
+            try:
+                user = await self.bot.fetch_user(user_id)
+            except discord.NotFound:
+                return
+        try:
+            await user.send(content)
+        except discord.HTTPException:
+            pass
+
+    async def _relay_from_dm(self, message: discord.Message):
+        ticket, role = self._find_relay_ticket(message.author.id)
+        if not ticket:
             return
-        body = message.content.strip()
-        if message.attachments:
-            body = (body + "\n" + "\n".join(a.url for a in message.attachments)).strip()
+        body = _relay_body(message)
         if not body:
             return
-        embed = discord.Embed(description=body, color=config.COLOR_INFO)
-        embed.set_author(name=config.RELAY_SELLER_NAME)
-        await channel.send(embed=embed)
-        if len(tickets) > 1:
-            try:
-                await message.channel.send(
-                    f"ℹ️ Ai mai multe conversații active — am trimis către ticketul #{ticket['id']}.")
-            except discord.HTTPException:
-                pass
+        guild = self.bot.get_guild(ticket["guild_id"])
+        channel = guild.get_channel(ticket["channel_id"]) if guild else None
+
+        if role == "buyer":
+            label = config.RELAY_BUYER_NAME
+            # către vânzător doar dacă a acceptat (e în discuție)
+            if ticket["status"] == "accepted":
+                await self._dm_user(ticket["author_id"], f"**{label}:** {body}")
+        else:  # seller
+            label = config.RELAY_SELLER_NAME
+            await self._dm_user(ticket["buyer_id"], f"**{label}:** {body}")
+
+        # în ticket (îl vede intermediarul)
+        if channel is not None:
+            embed = discord.Embed(description=body, color=config.COLOR_INFO)
+            embed.set_author(name=label)
+            await channel.send(embed=embed)
+
         try:
             await message.add_reaction("✅")
         except discord.HTTPException:
             pass
 
-    async def _relay_to_seller(self, message: discord.Message, ticket: dict):
-        seller = self.bot.get_user(ticket["author_id"])
-        if seller is None:
-            try:
-                seller = await self.bot.fetch_user(ticket["author_id"])
-            except discord.NotFound:
-                return
-        body = message.content.strip()
-        if message.attachments:
-            body = (body + "\n" + "\n".join(a.url for a in message.attachments)).strip()
+    async def _relay_from_ticket(self, message: discord.Message):
+        """Mesaj scris de intermediar în ticket → la ambele părți în DM."""
+        ticket = db.get_ticket_by_channel(message.channel.id)
+        if not ticket or ticket["status"] not in ("open", "accepted"):
+            return
+        body = _relay_body(message)
         if not body:
             return
-        try:
-            await seller.send(f"💬 **{message.author.display_name}:** {body}")
-        except discord.Forbidden:
-            pass
+        text = f"**{config.RELAY_STAFF_NAME}:** {body}"
+        await self._dm_user(ticket["buyer_id"], text)
+        if ticket["status"] == "accepted":
+            await self._dm_user(ticket["author_id"], text)
 
 
 async def setup(bot: commands.Bot):
