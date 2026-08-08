@@ -109,7 +109,7 @@ class CloseSupportButton(discord.ui.DynamicItem[discord.ui.Button],
 def make_panel_view() -> discord.ui.View:
     view = discord.ui.View(timeout=None)
     view.add_item(OpenSupportButton("suport"))
-    view.add_item(OpenSupportButton("cerere grad"))
+    view.add_item(OpenSupportButton("cerere_grad"))
     return view
 
 
@@ -136,7 +136,7 @@ class Support(commands.Cog):
         store.set_guild_value(channel.guild.id, "support_panel_message_id", msg.id)
 
     group = app_commands.Group(
-        name="support", description="Tichete de suport / cerere grad",
+        name="support", description="Tichete de suport / cerere_grad",
         default_permissions=discord.Permissions(administrator=True),
     )
 
