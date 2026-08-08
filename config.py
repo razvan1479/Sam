@@ -247,3 +247,6 @@ CAL_TODAY_LABEL    = "📍 Astăzi"
 CAL_UPCOMING_LABEL = "📌 Următoarele evenimente"
 CAL_EMPTY_LABEL    = "✅ Nu există evenimente programate."
 CAL_NOTIFY_HEADER  = "📅 Evenimentele de astăzi"
+
+# Câte zile de loguri se păstrează (restul se șterg automat, o dată pe zi)
+LOG_KEEP_DAYS = 30

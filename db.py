@@ -5,6 +5,8 @@ import os
 import time
 import sqlite3
 
+import config
+
 _DB_PATH = os.path.join(os.path.dirname(__file__), "data", "marketplace.db")
 
 # Toate coloanele există indiferent de cum arată modalul de creare — stratul de date e independent de UI.
@@ -412,13 +414,24 @@ def list_blacklist() -> list:
 
 # ---------- Loguri (toate acțiunile, pentru dashboard) ----------
 
+_last_prune_day = None
+
+
 def add_log(guild_id, action, detail=None) -> None:
+    global _last_prune_day
     now = int(time.time())
     with _connect() as conn:
         conn.execute(
             "INSERT INTO logs (guild_id, action, detail, created_at) VALUES (?,?,?,?)",
             (guild_id, action, detail, now),
         )
+        # Curățare automată: o singură dată pe zi (la primul log al zilei),
+        # șterge logurile mai vechi de LOG_KEEP_DAYS zile. Fără proces separat.
+        day = now // 86400
+        if _last_prune_day != day:
+            _last_prune_day = day
+            cutoff = now - config.LOG_KEEP_DAYS * 86400
+            conn.execute("DELETE FROM logs WHERE created_at < ?", (cutoff,))
 
 
 def list_logs(limit=300) -> list:
