@@ -1,21 +1,62 @@
 # dashboard.py — dashboard web (Flask) pentru marketplace.
 # Rulează în același proces cu botul, într-un thread separat, pe alt port (implicit 5001).
-# Citește/scrie aceeași bază de date SQLite. FĂRĂ login deocamdată.
+# Protejat cu parolă: setează DASHBOARD_PASSWORD în .env.
 
 import os
+import hmac
+import secrets as pysecrets
 import asyncio
 import datetime
 
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 
 import db
 import store
 import config
 
 app = Flask(__name__)
+app.secret_key = os.getenv("DASHBOARD_SECRET") or pysecrets.token_hex(32)
 
 # Referință către bot (setată din bot.py) — necesară pentru acțiuni care ating Discord-ul.
 bot = None
+
+
+# =========================================================
+#  Login — totul e protejat de parolă (DASHBOARD_PASSWORD din .env)
+# =========================================================
+
+def _password() -> str:
+    return os.getenv("DASHBOARD_PASSWORD", "")
+
+
+@app.before_request
+def _require_login():
+    if request.endpoint in ("login", "static"):
+        return None
+    if session.get("auth"):
+        return None
+    return redirect(url_for("login"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    pw = _password()
+    error = None
+    if request.method == "POST":
+        if not pw:
+            error = "Parola nu e setată pe server (DASHBOARD_PASSWORD în .env)."
+        elif hmac.compare_digest(request.form.get("password", ""), pw):
+            session["auth"] = True
+            return redirect(url_for("overview"))
+        else:
+            error = "Parolă greșită."
+    return render_template("login.html", error=error, pw_missing=(not pw))
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 def set_bot(b):

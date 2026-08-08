@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <title>Sam — Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="login-body">
+  <div class="login-box">
+    <div class="brand" style="margin-bottom:18px"><span>Sam</span></div>
+    {% if pw_missing %}
+    <div class="login-error">⚠️ Parola nu e setată. Adaugă <code>DASHBOARD_PASSWORD=...</code> în <code>.env</code> pe server și repornește botul.</div>
+    {% endif %}
+    {% if error and not pw_missing %}
+    <div class="login-error">{{ error }}</div>
+    {% endif %}
+    <form method="post">
+      <input type="password" name="password" placeholder="Parola" autofocus>
+      <button class="btn-accent" style="width:100%">Intră</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -180,3 +180,11 @@ h3 { font-size: 15px; color: var(--muted); margin: 0 0 10px; }
   border-radius: 8px; border: 1px solid var(--border);
   background: var(--panel2); color: var(--text); font-size: 14px;
 }
+
+/* Login */
+.login-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.login-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 28px; width: 320px; }
+.login-box input[type="password"] { display: block; width: 100%; margin-bottom: 12px; padding: 10px 12px;
+  border-radius: 8px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); font-size: 14px; }
+.login-error { background: rgba(237,66,69,.12); border: 1px solid rgba(237,66,69,.4); color: #f3b6b8;
+  padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
