@@ -188,3 +188,11 @@ h3 { font-size: 15px; color: var(--muted); margin: 0 0 10px; }
   border-radius: 8px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); font-size: 14px; }
 .login-error { background: rgba(237,66,69,.12); border: 1px solid rgba(237,66,69,.4); color: #f3b6b8;
   padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+
+/* Zonă periculoasă (reset testare) */
+.danger-title { margin-top: 30px; color: #ed4245; }
+.danger-zone { display: flex; flex-direction: column; gap: 12px; max-width: 620px;
+  border: 1px solid rgba(237,66,69,.4); border-radius: 10px; padding: 16px; background: rgba(237,66,69,.06); }
+.danger-zone form { display: flex; align-items: center; gap: 12px; }
+.danger-zone form span { color: var(--muted); font-size: 13px; }
+.danger-zone .btn-danger { white-space: nowrap; }

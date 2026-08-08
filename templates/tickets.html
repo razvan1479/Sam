@@ -1,6 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Tickete</h1>
+
+<h3>Categoria ticketelor</h3>
+<form method="post" action="{{ url_for('tickets_settings') }}" class="cal-settings">
+  {% if categories %}
+  <select name="category_id">
+    <option value="">— fără categorie —</option>
+    {% for cid, cname in categories %}
+    <option value="{{ cid }}" {{ 'selected' if cid == ticket_category_id }}>{{ cname }}</option>
+    {% endfor %}
+  </select>
+  {% else %}
+  <input type="text" name="category_id" value="{{ ticket_category_id or '' }}" placeholder="ID categorie">
+  {% endif %}
+  <button class="btn-accent">Salvează</button>
+</form>
+<p class="hint">Ticketele noi se creează în această categorie.</p>
+
+<h3 style="margin-top:24px">Listă</h3>
 {% if rows %}
 <table>
   <tr>

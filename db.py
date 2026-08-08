@@ -627,3 +627,37 @@ def get_active_tickets_for_buyer(buyer_id) -> list:
             (buyer_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ---------- Reset (pentru testare) ----------
+
+def reset_marketplace(guild_id) -> None:
+    """Șterge TOATĂ partea de market: anunțuri, tickete, blocări, blacklist, rapoarte, loguri.
+    NU atinge statisticile jucătorilor, calendarul sau leaderboard-ul."""
+    with _connect() as conn:
+        for t in ("announcements", "tickets", "blocks", "global_blacklist", "reports", "logs"):
+            conn.execute(f"DELETE FROM {t} WHERE guild_id=?", (guild_id,))
+        # resetează contoarele de ID doar dacă tabelul a rămas complet gol
+        for t in ("announcements", "tickets", "reports"):
+            if conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] == 0:
+                conn.execute("DELETE FROM sqlite_sequence WHERE name=?", (t,))
+
+
+def reset_players(guild_id) -> None:
+    """Șterge statisticile tuturor jucătorilor (finalizate, anulate, raportări)."""
+    with _connect() as conn:
+        conn.execute("DELETE FROM user_stats WHERE guild_id=?", (guild_id,))
+
+
+def reset_player(guild_id, user_id) -> None:
+    """Resetează statisticile unui singur jucător."""
+    with _connect() as conn:
+        conn.execute("DELETE FROM user_stats WHERE guild_id=? AND user_id=?", (guild_id, user_id))
+
+
+def reset_tickets(guild_id) -> None:
+    """Șterge toate ticketele (din baza de date). Nu atinge anunțurile sau jucătorii."""
+    with _connect() as conn:
+        conn.execute("DELETE FROM tickets WHERE guild_id=?", (guild_id,))
+        if conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0] == 0:
+            conn.execute("DELETE FROM sqlite_sequence WHERE name='tickets'")

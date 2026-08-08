@@ -10,4 +10,29 @@
   <div class="card"><div class="num">{{ stats.reports_confirmed }}/{{ stats.reports_total }}</div><div class="label">Rapoarte confirmate</div></div>
   <div class="card"><div class="num">{{ stats.blacklisted }}</div><div class="label">Pe blacklist</div></div>
 </div>
+
+<h3 class="danger-title">⚠️ Zonă periculoasă (testare)</h3>
+<div class="danger-zone">
+  <form method="post" action="{{ url_for('reset_market') }}"
+        onsubmit="return confirm('Sigur ștergi TOATĂ partea de market — anunțuri, tickete, blacklist, rapoarte, loguri? Acțiune IREVERSIBILĂ!');">
+    <button class="btn-danger">Reset market</button>
+    <span>Șterge anunțuri, tickete, blocări, blacklist, rapoarte și loguri. Statisticile jucătorilor rămân.</span>
+  </form>
+  <form method="post" action="{{ url_for('reset_tickets_route') }}"
+        onsubmit="return confirm('Sigur ștergi TOATE ticketele? Acțiune IREVERSIBILĂ!');">
+    <button class="btn-danger">Reset tickete</button>
+    <span>Șterge doar ticketele. Anunțurile și jucătorii rămân.</span>
+  </form>
+  <form method="post" action="{{ url_for('reset_players') }}"
+        onsubmit="return confirm('Sigur resetezi statisticile TUTUROR jucătorilor? Acțiune IREVERSIBILĂ!');">
+    <button class="btn-danger">Reset jucători</button>
+    <span>Șterge statisticile tuturor jucătorilor (finalizate, anulate, raportări).</span>
+  </form>
+  <form method="post" action="{{ url_for('reset_player_route') }}"
+        onsubmit="return confirm('Sigur resetezi statisticile acestui jucător?');">
+    <input type="text" name="user_id" placeholder="ID jucător" style="width:150px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--panel2);color:var(--text)">
+    <button class="btn-danger">Reset jucător</button>
+    <span>Resetează statisticile unui singur jucător (după ID).</span>
+  </form>
+</div>
 {% endblock %}

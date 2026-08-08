@@ -262,3 +262,5 @@ LOG_KEEP_DAYS = 30
 LOG_PROTECTED = [LOG_FINALIZED]
 
 MSG_FINALIZE_DM = "🤝 Tranzacția pentru anunțul **#{ann_id}** a fost **finalizată** de intermediar. Mulțumim! Conversația din DM a fost ștearsă."
+
+DM_ANON_NOTE = "🕵️ Cineva e interesat de anunțul tău și rămâne **anonim**. Vezi doar reputația lui:"

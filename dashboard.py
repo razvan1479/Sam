@@ -85,7 +85,24 @@ def announcements():
 
 @app.route("/tickets")
 def tickets():
-    return render_template("tickets.html", rows=db.list_tickets(), active="tickets")
+    gid = store.first_guild_id()
+    s = store.get_guild(gid) if gid else {}
+    categories = []
+    if bot is not None and gid:
+        g = bot.get_guild(gid)
+        if g:
+            categories = [(c.id, c.name) for c in g.categories]
+    return render_template("tickets.html", rows=db.list_tickets(), active="tickets",
+                           categories=categories, ticket_category_id=s.get("ticket_category_id"))
+
+
+@app.route("/tickets/settings", methods=["POST"])
+def tickets_settings():
+    gid = store.first_guild_id()
+    if gid:
+        cat = request.form.get("category_id", "").strip()
+        store.set_guild_value(gid, "ticket_category_id", int(cat) if cat.isdigit() else None)
+    return redirect(url_for("tickets"))
 
 
 @app.route("/blacklist")
@@ -273,6 +290,39 @@ def greeting_save():
             "color": request.form.get("color", "#5865f2").strip(),
         })
         return redirect(url_for(kind + "_page"))
+    return redirect(url_for("overview"))
+
+
+@app.route("/reset/market", methods=["POST"])
+def reset_market():
+    gid = store.first_guild_id()
+    if gid:
+        db.reset_marketplace(gid)
+    return redirect(url_for("overview"))
+
+
+@app.route("/reset/players", methods=["POST"])
+def reset_players():
+    gid = store.first_guild_id()
+    if gid:
+        db.reset_players(gid)
+    return redirect(url_for("overview"))
+
+
+@app.route("/reset/player", methods=["POST"])
+def reset_player_route():
+    gid = store.first_guild_id()
+    uid = request.form.get("user_id", "").strip()
+    if gid and uid.isdigit():
+        db.reset_player(gid, int(uid))
+    return redirect(url_for("overview"))
+
+
+@app.route("/reset/tickets", methods=["POST"])
+def reset_tickets_route():
+    gid = store.first_guild_id()
+    if gid:
+        db.reset_tickets(gid)
     return redirect(url_for("overview"))
 
 

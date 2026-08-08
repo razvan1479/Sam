@@ -70,15 +70,10 @@ def _relay_body(message: discord.Message) -> str:
 
 
 def build_dm_embed(buyer, ann_id: int, ticket_id: int, stats: dict) -> discord.Embed:
-    """Embed-ul trimis autorului în privat când cineva îi contactează anunțul."""
+    """Embed-ul trimis autorului când cineva îi contactează anunțul.
+    ANONIM: nu arată cine e cumpărătorul — doar reputația lui obiectivă."""
     e = discord.Embed(title=config.DM_TITLE.format(ann_id=ann_id), color=config.COLOR_INFO)
-    e.set_thumbnail(url=buyer.display_avatar.url)
-    e.add_field(name=config.DM_F_USER, value=buyer.mention, inline=False)  # mention = clickabil
-    e.add_field(name=config.DM_F_ID, value=str(buyer.id), inline=True)
-    e.add_field(name=config.DM_F_ACCOUNT, value=f"<t:{int(buyer.created_at.timestamp())}:D>", inline=True)
-    joined = getattr(buyer, "joined_at", None)
-    e.add_field(name=config.DM_F_JOINED,
-                value=(f"<t:{int(joined.timestamp())}:D>" if joined else "necunoscut"), inline=True)
+    e.description = config.DM_ANON_NOTE
     e.add_field(name=config.DM_F_COMPLETED, value=str(stats["completed"]), inline=True)
     e.add_field(name=config.DM_F_CANCELLED, value=str(stats["cancelled"]), inline=True)
     e.add_field(name=config.DM_F_REPORTS, value=str(stats["confirmed_reports"]), inline=True)
@@ -1262,11 +1257,6 @@ class Marketplace(commands.Cog):
             embed = discord.Embed(description=body, color=config.COLOR_INFO)
             embed.set_author(name=label)
             await channel.send(embed=embed)
-
-        try:
-            await message.add_reaction("✅")
-        except discord.HTTPException:
-            pass
 
     async def _relay_from_ticket(self, message: discord.Message):
         """Mesaj scris de intermediar în ticket → la ambele părți în DM."""
