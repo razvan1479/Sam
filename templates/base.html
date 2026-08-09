@@ -27,6 +27,7 @@
         <div class="nav-section">General</div>
         <a href="{{ url_for('logs') }}" class="{{ 'active' if active=='logs' }}">Loguri</a>
         <a href="{{ url_for('commands') }}" class="{{ 'active' if active=='commands' }}">Comenzi</a>
+        <a href="{{ url_for('version_page') }}" class="{{ 'active' if active=='version' }}">Versiune</a>
 
         <a href="{{ url_for('logout') }}" class="nav-logout">Deconectare</a>
       </nav>

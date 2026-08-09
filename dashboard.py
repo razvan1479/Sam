@@ -4,6 +4,7 @@
 
 import os
 import hmac
+import subprocess
 import secrets as pysecrets
 import asyncio
 import datetime
@@ -228,6 +229,43 @@ COMMANDS = [
 @app.route("/commands")
 def commands():
     return render_template("commands.html", groups=COMMANDS, active="commands")
+
+
+_REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _git(*args, timeout=10):
+    return subprocess.run(["git", *args], cwd=_REPO_DIR,
+                          capture_output=True, text=True, timeout=timeout)
+
+
+def git_version_info():
+    info = {"local": None, "subject": None, "when": None, "remote": None,
+            "up_to_date": None, "error": None}
+    try:
+        r = _git("rev-parse", "HEAD")
+        if r.returncode:
+            info["error"] = "Nu e un repo git pe server."
+            return info
+        local_full = r.stdout.strip()
+        info["local"] = local_full[:7]
+        info["subject"] = _git("log", "-1", "--pretty=%s").stdout.strip()
+        info["when"] = _git("log", "-1", "--pretty=%cd",
+                            "--date=format:%Y-%m-%d %H:%M").stdout.strip()
+        _git("fetch", "origin", "main", timeout=15)  # best-effort
+        rr = _git("rev-parse", "origin/main")
+        if rr.returncode == 0:
+            remote_full = rr.stdout.strip()
+            info["remote"] = remote_full[:7]
+            info["up_to_date"] = (remote_full == local_full)
+    except Exception as e:  # noqa: BLE001
+        info["error"] = str(e)
+    return info
+
+
+@app.route("/version")
+def version_page():
+    return render_template("version.html", active="version", info=git_version_info())
 
 
 # ============ Calendar ============

@@ -19,6 +19,17 @@ CID_DISLIKE = "lb:dislike"
 VOTE_COOLDOWN = 30      # secunde între voturi
 ACCESS_SECONDS = 300    # 5 minute acces temporar
 
+CID_SELECT = "lb:sel"
+TIER_SIZE = 10
+# (nume, emoji, culoare) — locurile 1-10 VIP, 11-20 Gold, 21-30 Silver, 31-40 Bronze, 41+ Iron
+TIER_DEFS = [
+    ("VIP", "👑", 0xF1C40F),
+    ("Gold", "🥇", 0xE5B80B),
+    ("Silver", "🥈", 0xBFC1C6),
+    ("Bronze", "🥉", 0xCD7F32),
+    ("Iron", "⚙️", 0x71797E),
+]
+
 _vote_cd: dict[int, float] = {}   # user_id -> ultimul vot (în memorie)
 
 
@@ -138,6 +149,73 @@ def make_promoter_view(pid: int) -> discord.ui.View:
 
 
 # =========================================================
+#  Tiere (VIP / Gold / Silver / Bronze / Iron) — un embed per tieră
+# =========================================================
+
+def _display_name(guild, p):
+    m = guild.get_member(p["user_id"])
+    return m.display_name if m else p["name"]
+
+
+def build_tiers(promoters):
+    """Împarte promoterii (deja sortați desc după scor) în tiere de câte 10.
+    Ultima tieră (Iron) ia tot restul. Returnează doar tierele care au promoteri."""
+    tiers = []
+    n = len(TIER_DEFS)
+    for i, (name, emoji, color) in enumerate(TIER_DEFS):
+        start = i * TIER_SIZE
+        chunk = promoters[start:] if i == n - 1 else promoters[start:start + TIER_SIZE]
+        if chunk:
+            tiers.append((name, emoji, color, chunk, start))
+    return tiers
+
+
+def build_tier_embed(guild, name, emoji, color, chunk, start):
+    lines = []
+    for j, p in enumerate(chunk):
+        rank = start + j + 1
+        lines.append(f"**{rank}.**  {_display_name(guild, p)}   —   ❤️ {p['likes']} | 💔 {p['dislikes']}")
+    return discord.Embed(title=f"{emoji}  {name}", description="\n".join(lines),
+                         color=discord.Color(color))
+
+
+def build_tier_view(guild, chunk, start):
+    options = []
+    for j, p in enumerate(chunk[:25]):
+        rank = start + j + 1
+        options.append(discord.SelectOption(
+            label=f"{rank}. {_display_name(guild, p)}"[:100], value=str(p["id"])))
+    return LeaderboardView(options)
+
+
+class TierSelect(discord.ui.Select):
+    def __init__(self, options=None):
+        super().__init__(custom_id=CID_SELECT, placeholder="Alege un promoter…",
+                         min_values=1, max_values=1,
+                         options=options or [discord.SelectOption(label="—", value="0")])
+
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            pid = int(self.values[0])
+        except (ValueError, IndexError):
+            await interaction.response.send_message("❌ Selecție invalidă.", ephemeral=True)
+            return
+        promoter = db.get_promoter(pid)
+        if not promoter:
+            await interaction.response.send_message("❌ Promoter inexistent.", ephemeral=True)
+            return
+        name = _display_name(interaction.guild, promoter)
+        await interaction.response.send_message(
+            f"**{name}** — alege acțiunea:", view=make_promoter_view(pid), ephemeral=True)
+
+
+class LeaderboardView(discord.ui.View):
+    def __init__(self, options=None):
+        super().__init__(timeout=None)
+        self.add_item(TierSelect(options))
+
+
+# =========================================================
 #  Cog
 # =========================================================
 
@@ -147,28 +225,30 @@ class Leaderboard(commands.Cog):
 
     async def cog_load(self):
         self.bot.add_dynamic_items(AccessButton, LikeButton, DislikeButton)
+        self.bot.add_view(LeaderboardView())
 
-    # ---- redare ----
+    # ---- redare (tiere) ----
     async def regenerate_leaderboard(self, guild, channel, promoters=None):
         if promoters is None:
             promoters = db.list_promoters_sorted(guild.id)
         s = store.get_guild(guild.id)
-        for mid in (s.get("leaderboard_message_ids") or []):
-            try:
-                m = await channel.fetch_message(mid)
-                await m.delete()
-            except discord.HTTPException:
-                pass
+        # șterge mesajele vechi (inclusiv formatul vechi, un-mesaj-per-promoter)
+        for key in ("lb_tier_message_ids", "leaderboard_message_ids"):
+            for mid in (s.get(key) or []):
+                try:
+                    m = await channel.fetch_message(mid)
+                    await m.delete()
+                except discord.HTTPException:
+                    pass
+        store.set_guild_value(guild.id, "leaderboard_message_ids", [])
+
         new_ids = []
-        for i, p in enumerate(promoters):
-            member = guild.get_member(p["user_id"])
-            name = member.display_name if member else p["name"]
+        for (name, emoji, color, chunk, start) in build_tiers(promoters):
             msg = await channel.send(
-                content=render_row(i + 1, name, p["likes"], p["dislikes"]),
-                view=make_promoter_view(p["id"]),
-            )
+                embed=build_tier_embed(guild, name, emoji, color, chunk, start),
+                view=build_tier_view(guild, chunk, start))
             new_ids.append(msg.id)
-        store.set_guild_value(guild.id, "leaderboard_message_ids", new_ids)
+        store.set_guild_value(guild.id, "lb_tier_message_ids", new_ids)
 
     async def refresh_leaderboard(self, guild):
         s = store.get_guild(guild.id)
@@ -179,18 +259,17 @@ class Leaderboard(commands.Cog):
         if channel is None:
             return
         promoters = db.list_promoters_sorted(guild.id)
-        msg_ids = s.get("leaderboard_message_ids") or []
-        # dacă s-a schimbat numărul de promoteri (add/remove) → regenerăm complet
-        if len(msg_ids) != len(promoters):
+        tiers = build_tiers(promoters)
+        msg_ids = s.get("lb_tier_message_ids") or []
+        # dacă s-a schimbat numărul de tiere (add/remove/urcări) → regenerăm
+        if len(msg_ids) != len(tiers):
             await self.regenerate_leaderboard(guild, channel, promoters)
             return
-        for i, p in enumerate(promoters):
-            member = guild.get_member(p["user_id"])
-            name = member.display_name if member else p["name"]
+        for i, (name, emoji, color, chunk, start) in enumerate(tiers):
             try:
                 msg = await channel.fetch_message(msg_ids[i])
-                await msg.edit(content=render_row(i + 1, name, p["likes"], p["dislikes"]),
-                               view=make_promoter_view(p["id"]))
+                await msg.edit(embed=build_tier_embed(guild, name, emoji, color, chunk, start),
+                               view=build_tier_view(guild, chunk, start))
             except discord.NotFound:
                 await self.regenerate_leaderboard(guild, channel, promoters)
                 return

@@ -205,3 +205,9 @@ h3 { font-size: 15px; color: var(--muted); margin: 0 0 10px; }
 .danger-zone form { display: flex; align-items: center; gap: 12px; }
 .danger-zone form span { color: var(--muted); font-size: 13px; }
 .danger-zone .btn-danger { white-space: nowrap; }
+
+/* Pagina Versiune */
+.ver-box { max-width: 620px; border: 1px solid var(--border); border-radius: 10px; padding: 16px; background: var(--panel); }
+.ver-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; flex-wrap: wrap; }
+.ver-label { width: 90px; color: var(--muted); font-size: 13px; }
+.ver-sub { color: var(--muted); font-size: 13px; }

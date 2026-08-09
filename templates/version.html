@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Versiune</h1>
+
+{% if info.error %}
+<div class="empty">Nu pot citi versiunea de pe server: {{ info.error }}</div>
+{% else %}
+<div class="ver-box">
+  <div class="ver-row">
+    <span class="ver-label">Pe server</span>
+    <code>{{ info.local }}</code>
+    <span class="ver-sub">{{ info.subject }} · {{ info.when }}</span>
+  </div>
+  {% if info.remote %}
+  <div class="ver-row">
+    <span class="ver-label">Pe GitHub</span>
+    <code>{{ info.remote }}</code>
+  </div>
+  <div style="margin-top:10px">
+    {% if info.up_to_date %}
+    <span class="badge green">✅ La zi — serverul rulează ultima versiune</span>
+    {% else %}
+    <span class="badge red">⚠️ Versiune nouă pe GitHub — încă neaplicată pe server</span>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="ver-sub" style="margin-top:8px">Nu am putut verifica GitHub (fetch eșuat). Versiunea de pe server e cea afișată sus.</div>
+  {% endif %}
+</div>
+
+{% if info.remote and not info.up_to_date %}
+<p class="hint">Auto-deploy-ul aplică push-urile automat în câteva secunde. Dacă rămâne așa, verifică tab-ul <b>Actions</b> din repo — poate a picat deploy-ul.</p>
+{% endif %}
+
+<a href="{{ url_for('version_page') }}"><button class="btn-accent" style="margin-top:14px">🔄 Reverifică</button></a>
+{% endif %}
+{% endblock %}
