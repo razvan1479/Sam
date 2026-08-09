@@ -135,10 +135,6 @@ class Calendar(commands.Cog):
         if msg is None:
             msg = await channel.send(content)
             store.set_guild_value(guild.id, "calendar_message_id", msg.id)
-            try:
-                await msg.pin()
-            except discord.HTTPException:
-                pass
         else:
             try:
                 await msg.edit(content=content)

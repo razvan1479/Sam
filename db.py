@@ -104,11 +104,12 @@ CREATE INDEX IF NOT EXISTS idx_cal_guild_date ON calendar_events(guild_id, date)
 CREATE TABLE IF NOT EXISTS promoters (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     guild_id   INTEGER NOT NULL,
+    board      TEXT NOT NULL DEFAULT 'promoteri',
     user_id    INTEGER NOT NULL,
     name       TEXT NOT NULL,
     channel_id INTEGER,
     created_at INTEGER NOT NULL,
-    UNIQUE(guild_id, user_id)
+    UNIQUE(guild_id, board, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS support_tickets (
@@ -153,6 +154,25 @@ def init_db() -> None:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
             except sqlite3.OperationalError:
                 pass  # coloana există deja
+        # migrare promoters → multi-board (schimbă și constrângerea UNIQUE, deci rebuild)
+        pcols = [r[1] for r in conn.execute("PRAGMA table_info(promoters)").fetchall()]
+        if pcols and "board" not in pcols:
+            conn.executescript("""
+                CREATE TABLE promoters_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER NOT NULL,
+                    board TEXT NOT NULL DEFAULT 'promoteri',
+                    user_id INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    channel_id INTEGER,
+                    created_at INTEGER NOT NULL,
+                    UNIQUE(guild_id, board, user_id)
+                );
+                INSERT INTO promoters_new (id, guild_id, board, user_id, name, channel_id, created_at)
+                    SELECT id, guild_id, 'promoteri', user_id, name, channel_id, created_at FROM promoters;
+                DROP TABLE promoters;
+                ALTER TABLE promoters_new RENAME TO promoters;
+            """)
 
 
 # ---------- Anunțuri ----------
@@ -550,13 +570,13 @@ def delete_past_events(guild_id, today) -> int:
 
 # ---------- Leaderboard promoteri ----------
 
-def add_promoter(guild_id, user_id, name, channel_id) -> int:
+def add_promoter(guild_id, board, user_id, name, channel_id) -> int:
     now = int(time.time())
     with _connect() as conn:
         cur = conn.execute(
-            """INSERT INTO promoters (guild_id, user_id, name, channel_id, created_at)
-               VALUES (?,?,?,?,?)""",
-            (guild_id, user_id, name, channel_id, now),
+            """INSERT INTO promoters (guild_id, board, user_id, name, channel_id, created_at)
+               VALUES (?,?,?,?,?,?)""",
+            (guild_id, board, user_id, name, channel_id, now),
         )
         return cur.lastrowid
 
@@ -567,10 +587,11 @@ def get_promoter(promoter_id) -> dict | None:
         return dict(row) if row else None
 
 
-def get_promoter_by_user(guild_id, user_id) -> dict | None:
+def get_promoter_by_user(guild_id, board, user_id) -> dict | None:
     with _connect() as conn:
         row = conn.execute(
-            "SELECT * FROM promoters WHERE guild_id=? AND user_id=?", (guild_id, user_id)
+            "SELECT * FROM promoters WHERE guild_id=? AND board=? AND user_id=?",
+            (guild_id, board, user_id),
         ).fetchone()
         return dict(row) if row else None
 
@@ -581,8 +602,8 @@ def remove_promoter(promoter_id) -> None:
         conn.execute("DELETE FROM promoters WHERE id=?", (promoter_id,))
 
 
-def list_promoters_sorted(guild_id) -> list:
-    """Toți promoterii cu likes/dislikes, sortați după scor (like-dislike) desc."""
+def list_promoters_sorted(guild_id, board) -> list:
+    """Membrii unui board cu likes/dislikes, sortați după scor (like-dislike) desc."""
     with _connect() as conn:
         rows = conn.execute(
             """SELECT p.*,
@@ -590,9 +611,9 @@ def list_promoters_sorted(guild_id) -> list:
                       COALESCE(SUM(CASE WHEN v.value=-1 THEN 1 ELSE 0 END), 0) AS dislikes
                FROM promoters p
                LEFT JOIN promoter_votes v ON v.promoter_id = p.id
-               WHERE p.guild_id=?
+               WHERE p.guild_id=? AND p.board=?
                GROUP BY p.id""",
-            (guild_id,),
+            (guild_id, board),
         ).fetchall()
     promoters = [dict(r) for r in rows]
     promoters.sort(key=lambda p: (-(p["likes"] - p["dislikes"]), -p["likes"], p["name"].lower()))

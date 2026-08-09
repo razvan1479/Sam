@@ -3,6 +3,7 @@
 # La fiecare vot: recalculează, re-sortează și editează toate mesajele.
 
 import asyncio
+import re
 import time
 
 import discord
@@ -31,6 +32,41 @@ TIER_DEFS = [
 ]
 
 _vote_cd: dict[int, float] = {}   # user_id -> ultimul vot (în memorie)
+
+
+# ---- board-uri (Promoteri, Discord Manager, Tehnicieni, ...) ----
+
+def slugify(name: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return s or "board"
+
+
+def get_boards(gid: int) -> list:
+    s = store.get_guild(gid)
+    boards = s.get("lb_boards")
+    if boards is None:
+        # migrare din vechile setări de „promoteri" (un singur board)
+        if s.get("leaderboard_channel_id"):
+            boards = [{
+                "slug": "promoteri", "name": "Promoteri",
+                "channel_id": s.get("leaderboard_channel_id"),
+                "role_id": s.get("promoter_role_id"),
+                "category_id": s.get("promoter_category_id"),
+            }]
+            store.set_guild_value(gid, "lb_boards", boards)
+            if s.get("lb_tier_message_ids"):
+                store.set_guild_value(gid, "lb_msgids_promoteri", s.get("lb_tier_message_ids"))
+        else:
+            boards = []
+    return boards
+
+
+def get_board(gid: int, slug: str) -> dict | None:
+    return next((b for b in get_boards(gid) if b["slug"] == slug), None)
+
+
+def save_boards(gid: int, boards: list) -> None:
+    store.set_guild_value(gid, "lb_boards", boards)
 
 
 def render_row(rank: int, name: str, likes: int, dislikes: int) -> str:
@@ -105,7 +141,7 @@ async def _do_vote(interaction: discord.Interaction, pid: int, value: int, deja_
     _vote_cd[interaction.user.id] = now
     cog = interaction.client.get_cog("Leaderboard")
     if cog:
-        await cog.refresh_leaderboard(interaction.guild)
+        await cog.refresh_leaderboard(interaction.guild, promoter.get("board", "promoteri"))
     await interaction.response.send_message(
         "👍 Like înregistrat." if value == 1 else "👎 Dislike înregistrat.", ephemeral=True)
 
@@ -223,6 +259,12 @@ class LeaderboardView(discord.ui.View):
         self.add_item(TierSelect(options))
 
 
+async def board_autocomplete(interaction: discord.Interaction, current: str):
+    cur = (current or "").lower()
+    return [app_commands.Choice(name=b["name"], value=b["slug"])
+            for b in get_boards(interaction.guild_id) if cur in b["name"].lower()][:25]
+
+
 # =========================================================
 #  Cog
 # =========================================================
@@ -235,43 +277,49 @@ class Leaderboard(commands.Cog):
         self.bot.add_dynamic_items(AccessButton, LikeButton, DislikeButton)
         self.bot.add_view(LeaderboardView())
 
-    # ---- redare (tiere) ----
-    async def regenerate_leaderboard(self, guild, channel, promoters=None):
-        if promoters is None:
-            promoters = db.list_promoters_sorted(guild.id)
+    # ---- redare (tiere), per board ----
+    async def regenerate_leaderboard(self, guild, board_slug):
+        board = get_board(guild.id, board_slug)
+        if not board or not board.get("channel_id"):
+            return
+        channel = guild.get_channel(board["channel_id"])
+        if channel is None:
+            return
         s = store.get_guild(guild.id)
-        # șterge mesajele vechi (inclusiv formatul vechi, un-mesaj-per-promoter)
-        for key in ("lb_tier_message_ids", "leaderboard_message_ids"):
-            for mid in (s.get(key) or []):
+        key = f"lb_msgids_{board_slug}"
+        keys = [key] + (["leaderboard_message_ids"] if board_slug == "promoteri" else [])
+        for k in keys:
+            for mid in (s.get(k) or []):
                 try:
                     m = await channel.fetch_message(mid)
                     await m.delete()
                 except discord.HTTPException:
                     pass
-        store.set_guild_value(guild.id, "leaderboard_message_ids", [])
+        if board_slug == "promoteri":
+            store.set_guild_value(guild.id, "leaderboard_message_ids", [])
 
+        promoters = db.list_promoters_sorted(guild.id, board_slug)
         new_ids = []
         for (name, emoji, color, chunk, start) in build_tiers(promoters):
             msg = await channel.send(
                 embed=build_tier_embed(guild, name, emoji, color, chunk, start),
                 view=build_tier_view(guild, chunk, start))
             new_ids.append(msg.id)
-        store.set_guild_value(guild.id, "lb_tier_message_ids", new_ids)
+        store.set_guild_value(guild.id, key, new_ids)
 
-    async def refresh_leaderboard(self, guild):
-        s = store.get_guild(guild.id)
-        ch_id = s.get("leaderboard_channel_id")
-        if not ch_id:
+    async def refresh_leaderboard(self, guild, board_slug):
+        board = get_board(guild.id, board_slug)
+        if not board or not board.get("channel_id"):
             return
-        channel = guild.get_channel(ch_id)
+        channel = guild.get_channel(board["channel_id"])
         if channel is None:
             return
-        promoters = db.list_promoters_sorted(guild.id)
+        promoters = db.list_promoters_sorted(guild.id, board_slug)
         tiers = build_tiers(promoters)
-        msg_ids = s.get("lb_tier_message_ids") or []
-        # dacă s-a schimbat numărul de tiere (add/remove/urcări) → regenerăm
+        key = f"lb_msgids_{board_slug}"
+        msg_ids = store.get_guild(guild.id).get(key) or []
         if len(msg_ids) != len(tiers):
-            await self.regenerate_leaderboard(guild, channel, promoters)
+            await self.regenerate_leaderboard(guild, board_slug)
             return
         for i, (name, emoji, color, chunk, start) in enumerate(tiers):
             try:
@@ -279,45 +327,54 @@ class Leaderboard(commands.Cog):
                 await msg.edit(embed=build_tier_embed(guild, name, emoji, color, chunk, start),
                                view=build_tier_view(guild, chunk, start))
             except discord.NotFound:
-                await self.regenerate_leaderboard(guild, channel, promoters)
+                await self.regenerate_leaderboard(guild, board_slug)
                 return
 
     # ---- comenzi ----
     group = app_commands.Group(
-        name="promoter", description="Leaderboard promoteri",
+        name="leaderboard", description="Clasamente (promoteri, staff etc.)",
         default_permissions=discord.Permissions(administrator=True),
     )
 
-    @group.command(name="setup", description="Setează canalul clasamentului, rolul și categoria")
-    @app_commands.describe(canal="Canalul clasamentului", rol="Rolul Promoter",
-                           categorie="Categoria pentru canalele promoterilor (opțional)")
-    async def setup_cmd(self, interaction: discord.Interaction, canal: discord.TextChannel,
-                        rol: discord.Role, categorie: discord.CategoryChannel = None):
-        store.set_guild_value(interaction.guild_id, "leaderboard_channel_id", canal.id)
-        store.set_guild_value(interaction.guild_id, "promoter_role_id", rol.id)
-        if categorie:
-            store.set_guild_value(interaction.guild_id, "promoter_category_id", categorie.id)
+    @group.command(name="create", description="Creează/actualizează un board (clasament)")
+    @app_commands.describe(nume="Numele board-ului (ex. Developeri)", canal="Canalul clasamentului",
+                           rol="Rolul acordat membrilor", categorie="Categoria canalelor (opțional)")
+    async def create_cmd(self, interaction: discord.Interaction, nume: str,
+                         canal: discord.TextChannel, rol: discord.Role,
+                         categorie: discord.CategoryChannel = None):
+        gid = interaction.guild_id
+        slug = slugify(nume)
+        boards = get_boards(gid)
+        existing = next((b for b in boards if b["slug"] == slug), None)
+        data = {"slug": slug, "name": nume, "channel_id": canal.id, "role_id": rol.id,
+                "category_id": categorie.id if categorie else None}
+        if existing:
+            existing.update(data)
+        else:
+            boards.append(data)
+        save_boards(gid, boards)
         await interaction.response.defer(ephemeral=True)
-        await self.regenerate_leaderboard(interaction.guild, canal)
+        await self.regenerate_leaderboard(interaction.guild, slug)
         await interaction.followup.send(
-            f"✅ Leaderboard setat în {canal.mention}. Rol: {rol.mention}.", ephemeral=True)
+            f"✅ Board **{nume}** setat în {canal.mention}, rol {rol.mention}.", ephemeral=True)
 
-    @group.command(name="add", description="Adaugă un promoter (creează canal + rol)")
-    @app_commands.describe(membru="Utilizatorul care devine promoter")
-    async def add_cmd(self, interaction: discord.Interaction, membru: discord.Member):
-        s = store.get_guild(interaction.guild_id)
-        if not s.get("leaderboard_channel_id"):
+    @group.command(name="add", description="Adaugă un membru într-un board (creează canal + rol)")
+    @app_commands.describe(board="Board-ul", membru="Membrul de adăugat")
+    @app_commands.autocomplete(board=board_autocomplete)
+    async def add_cmd(self, interaction: discord.Interaction, board: str, membru: discord.Member):
+        gid = interaction.guild_id
+        b = get_board(gid, board)
+        if not b:
             await interaction.response.send_message(
-                "❌ Rulează întâi `/promoter setup`.", ephemeral=True)
+                "❌ Board inexistent. Vezi `/leaderboard list`.", ephemeral=True)
             return
-        if db.get_promoter_by_user(interaction.guild_id, membru.id):
+        if db.get_promoter_by_user(gid, board, membru.id):
             await interaction.response.send_message(
-                "❌ Acest utilizator e deja promoter.", ephemeral=True)
+                f"❌ {membru.mention} e deja în **{b['name']}**.", ephemeral=True)
             return
-
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
-        category = guild.get_channel(s["promoter_category_id"]) if s.get("promoter_category_id") else None
+        category = guild.get_channel(b["category_id"]) if b.get("category_id") else None
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             membru: discord.PermissionOverwrite(
@@ -327,70 +384,97 @@ class Leaderboard(commands.Cog):
         }
         try:
             channel = await guild.create_text_channel(
-                name=f"promoter-{membru.name}", overwrites=overwrites, category=category,
-                reason="canal promoter")
+                name=f"{board}-{membru.name}", overwrites=overwrites, category=category,
+                reason=f"canal {b['name']}")
         except discord.Forbidden:
-            await interaction.followup.send(
-                "❌ Nu am permisiunea «Manage Channels».", ephemeral=True)
+            await interaction.followup.send("❌ Nu am permisiunea «Manage Channels».", ephemeral=True)
             return
-
-        role = guild.get_role(s["promoter_role_id"]) if s.get("promoter_role_id") else None
+        role = guild.get_role(b["role_id"]) if b.get("role_id") else None
         if role:
             try:
-                await membru.add_roles(role, reason="promoter")
+                await membru.add_roles(role, reason=b["name"])
             except discord.Forbidden:
                 pass
-
-        db.add_promoter(guild.id, membru.id, membru.display_name, channel.id)
-        await self.refresh_leaderboard(guild)
+        db.add_promoter(gid, board, membru.id, membru.display_name, channel.id)
+        await self.refresh_leaderboard(guild, board)
         await interaction.followup.send(
-            f"✅ {membru.mention} e acum promoter. Canal: {channel.mention}.", ephemeral=True)
+            f"✅ {membru.mention} adăugat în **{b['name']}**. Canal: {channel.mention}.", ephemeral=True)
 
-    @group.command(name="remove", description="Scoate un promoter (șterge canal + rol)")
-    @app_commands.describe(membru="Promoterul de scos")
-    async def remove_cmd(self, interaction: discord.Interaction, membru: discord.Member):
-        p = db.get_promoter_by_user(interaction.guild_id, membru.id)
+    @group.command(name="remove", description="Scoate un membru dintr-un board (șterge canal + rol)")
+    @app_commands.describe(board="Board-ul", membru="Membrul de scos")
+    @app_commands.autocomplete(board=board_autocomplete)
+    async def remove_cmd(self, interaction: discord.Interaction, board: str, membru: discord.Member):
+        gid = interaction.guild_id
+        b = get_board(gid, board)
+        p = db.get_promoter_by_user(gid, board, membru.id)
         if not p:
             await interaction.response.send_message(
-                "❌ Utilizatorul nu e promoter.", ephemeral=True)
+                "❌ Membrul nu e în acest board.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
         guild = interaction.guild
-
         if p.get("channel_id"):
             ch = guild.get_channel(p["channel_id"])
             if ch is not None:
                 try:
-                    await ch.delete(reason="promoter scos")
+                    await ch.delete(reason="scos din board")
                 except discord.HTTPException:
                     pass
-
-        s = store.get_guild(guild.id)
-        role = guild.get_role(s["promoter_role_id"]) if s.get("promoter_role_id") else None
+        role = guild.get_role(b["role_id"]) if b and b.get("role_id") else None
         if role and role in membru.roles:
             try:
-                await membru.remove_roles(role, reason="promoter scos")
+                await membru.remove_roles(role, reason="scos din board")
             except discord.Forbidden:
                 pass
-
         db.remove_promoter(p["id"])
-        await self.refresh_leaderboard(guild)
-        await interaction.followup.send(f"✅ {membru.mention} nu mai e promoter.", ephemeral=True)
+        await self.refresh_leaderboard(guild, board)
+        await interaction.followup.send(
+            f"✅ {membru.mention} scos din **{b['name'] if b else board}**.", ephemeral=True)
 
-    @group.command(name="regenereaza", description="Repostează clasamentul")
-    async def regen_cmd(self, interaction: discord.Interaction):
-        s = store.get_guild(interaction.guild_id)
-        ch_id = s.get("leaderboard_channel_id")
-        if not ch_id:
-            await interaction.response.send_message("❌ Rulează întâi `/promoter setup`.", ephemeral=True)
-            return
-        channel = interaction.guild.get_channel(ch_id)
-        if channel is None:
-            await interaction.response.send_message("❌ Canalul salvat nu mai există.", ephemeral=True)
+    @group.command(name="regenereaza", description="Repostează clasamentul unui board")
+    @app_commands.describe(board="Board-ul")
+    @app_commands.autocomplete(board=board_autocomplete)
+    async def regen_cmd(self, interaction: discord.Interaction, board: str):
+        if not get_board(interaction.guild_id, board):
+            await interaction.response.send_message("❌ Board inexistent.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
-        await self.regenerate_leaderboard(interaction.guild, channel)
+        await self.regenerate_leaderboard(interaction.guild, board)
         await interaction.followup.send("✅ Clasament regenerat.", ephemeral=True)
+
+    @group.command(name="delete", description="Șterge un board (config + mesaje; membrii rămân în DB)")
+    @app_commands.describe(board="Board-ul de șters")
+    @app_commands.autocomplete(board=board_autocomplete)
+    async def delete_cmd(self, interaction: discord.Interaction, board: str):
+        gid = interaction.guild_id
+        b = get_board(gid, board)
+        if not b:
+            await interaction.response.send_message("❌ Board inexistent.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        channel = interaction.guild.get_channel(b["channel_id"]) if b.get("channel_id") else None
+        if channel:
+            for mid in (store.get_guild(gid).get(f"lb_msgids_{board}") or []):
+                try:
+                    m = await channel.fetch_message(mid)
+                    await m.delete()
+                except discord.HTTPException:
+                    pass
+        save_boards(gid, [x for x in get_boards(gid) if x["slug"] != board])
+        await interaction.followup.send(f"✅ Board **{b['name']}** șters.", ephemeral=True)
+
+    @group.command(name="list", description="Arată board-urile configurate")
+    async def list_cmd(self, interaction: discord.Interaction):
+        boards = get_boards(interaction.guild_id)
+        if not boards:
+            await interaction.response.send_message(
+                "Niciun board. Creează unul cu `/leaderboard create`.", ephemeral=True)
+            return
+        lines = []
+        for b in boards:
+            n = len(db.list_promoters_sorted(interaction.guild_id, b["slug"]))
+            lines.append(f"• **{b['name']}** (`{b['slug']}`) — {n} membri")
+        await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

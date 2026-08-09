@@ -209,11 +209,13 @@ COMMANDS = [
         ("/seteaza_ora_notificare", "ora:HH:MM", "Setează ora notificării zilnice."),
         ("/regenereaza", "", "Recreează mesajul cu calendarul."),
     ]),
-    ("Leaderboard promoteri (admin)", [
-        ("/promoter setup", "canal rol [categorie]", "Configurează clasamentul (canal, rolul Promoter, categoria canalelor)."),
-        ("/promoter add", "membru", "Adaugă un promoter: creează canal privat, dă rolul și îl bagă în clasament."),
-        ("/promoter remove", "membru", "Scoate un promoter: șterge canalul și rolul."),
-        ("/promoter regenereaza", "", "Repostează clasamentul."),
+    ("Leaderboard / Board-uri (admin)", [
+        ("/leaderboard create", "nume canal rol [categorie]", "Creează un board nou (Promoteri, Developeri, GFX...)."),
+        ("/leaderboard add", "board membru", "Adaugă un membru într-un board (creează canal + dă rolul)."),
+        ("/leaderboard remove", "board membru", "Scoate un membru (șterge canal + rol)."),
+        ("/leaderboard regenereaza", "board", "Repostează clasamentul unui board."),
+        ("/leaderboard delete", "board", "Șterge un board (config + mesaje)."),
+        ("/leaderboard list", "", "Arată board-urile configurate."),
     ]),
     ("Tichete suport (admin)", [
         ("/ticket_panel", "", "Postează panoul de tichete în canalul curent (după ce ai configurat tipuri din dashboard)."),
