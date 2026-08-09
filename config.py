@@ -284,3 +284,26 @@ SUPPORT_ALREADY_OPEN = "❌ Ai deja un tichet deschis. Închide-l înainte să d
 SUPPORT_CREATED     = "✅ Tichet deschis: {channel}"
 SUPPORT_NO_SETUP    = "❌ Sistemul de suport nu e configurat. Rulează `/support setup`."
 SUPPORT_ONLY_STAFF  = "❌ Doar staff-ul sau cel care a deschis tichetul îl poate închide."
+
+
+# =========================================================
+#  Tichete stil Ticket Tool (ca Sir Penguin)
+# =========================================================
+CID_TK_OPEN   = "tk:open"
+CID_TK_CLOSE  = "tk:close"
+CID_TK_CLOSER = "tk:closer"
+CID_TK_CLAIM  = "tk:claim"
+
+TK_PANEL_TITLE_DEFAULT = "🎫 Deschide un tichet"
+TK_PANEL_DESC_DEFAULT  = "Alege mai jos tipul de tichet. Se va crea un canal privat între tine și echipă."
+TK_OPEN_DEFAULT        = "Bun venit, {user}! Descrie pe scurt cu ce te putem ajuta — echipa îți răspunde curând."
+TK_BTN_CLOSE   = "🔒 Închide"
+TK_BTN_CLOSER  = "📝 Închide cu motiv"
+TK_BTN_CLAIM   = "🙋 Revendică"
+TK_CLAIMED     = "🙋 Tichet revendicat de {user}."
+TK_ALREADY_CLAIMED = "❌ Tichetul e deja revendicat de <@{uid}>."
+TK_CLOSING     = "🔒 Tichet închis. Canalul se șterge în câteva secunde."
+TK_ALREADY_OPEN = "❌ Ai deja un tichet deschis de acest tip."
+TK_CREATED     = "✅ Tichet deschis: {channel}"
+TK_ONLY_STAFF  = "❌ Doar staff-ul sau cel care a deschis tichetul poate face asta."
+TK_NO_TYPES    = "❌ Nu e configurat niciun tip de tichet. Adaugă din dashboard (pagina Suport)."

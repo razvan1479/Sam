@@ -144,6 +144,15 @@ def init_db() -> None:
     """Creează tabelele dacă nu există. Se apelează o dată, la pornirea botului."""
     with _connect() as conn:
         conn.executescript(_SCHEMA)
+        # migrări idempotente (coloane adăugate după ce tabelul exista deja)
+        for table, col, decl in [
+            ("support_tickets", "claimed_by", "INTEGER"),
+            ("support_tickets", "reason", "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+            except sqlite3.OperationalError:
+                pass  # coloana există deja
 
 
 # ---------- Anunțuri ----------
@@ -724,3 +733,13 @@ def reset_support_tickets(guild_id) -> None:
         conn.execute("DELETE FROM support_tickets WHERE guild_id=?", (guild_id,))
         if conn.execute("SELECT COUNT(*) FROM support_tickets").fetchone()[0] == 0:
             conn.execute("DELETE FROM sqlite_sequence WHERE name='support_tickets'")
+
+
+def set_support_claimed(ticket_id, claimed_by) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE support_tickets SET claimed_by=? WHERE id=?", (claimed_by, ticket_id))
+
+
+def set_support_reason(ticket_id, reason) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE support_tickets SET reason=? WHERE id=?", (reason, ticket_id))

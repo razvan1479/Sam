@@ -109,27 +109,71 @@ def tickets_settings():
 def support_page():
     gid = store.first_guild_id()
     s = store.get_guild(gid) if gid else {}
-    categories, roles = [], []
+    cats, roles, channels = [], [], []
     if bot is not None and gid:
         g = bot.get_guild(gid)
         if g:
-            categories = [(c.id, c.name) for c in g.categories]
+            cats = [(c.id, c.name) for c in g.categories]
             roles = [(r.id, r.name) for r in g.roles if not r.is_default()]
+            channels = [(c.id, c.name) for c in g.text_channels]
     return render_template("support.html", active="support",
-                           rows=db.list_support_tickets(gid) if gid else [],
-                           categories=categories, roles=roles,
-                           support_category_id=s.get("support_category_id"),
-                           support_role_id=s.get("support_role_id"))
+                           panel=s.get("tk_panel") or {}, types=s.get("tk_types") or [],
+                           log_channel_id=s.get("tk_log_channel_id"),
+                           categories=cats, roles=roles, channels=channels,
+                           rows=db.list_support_tickets(gid) if gid else [])
 
 
-@app.route("/support/settings", methods=["POST"])
-def support_settings():
+@app.route("/support/panel", methods=["POST"])
+def support_panel_save():
     gid = store.first_guild_id()
     if gid:
+        store.set_guild_value(gid, "tk_panel", {
+            "title": request.form.get("title", "").strip(),
+            "description": request.form.get("description", "").strip(),
+            "color": request.form.get("color", "#5865f2").strip(),
+            "banner": request.form.get("banner", "").strip(),
+            "thumbnail": request.form.get("thumbnail", "").strip(),
+        })
+        log = request.form.get("log_channel_id", "").strip()
+        store.set_guild_value(gid, "tk_log_channel_id", int(log) if log.isdigit() else None)
+    return redirect(url_for("support_page"))
+
+
+@app.route("/support/type/add", methods=["POST"])
+def support_type_add():
+    gid = store.first_guild_id()
+    if gid:
+        types = list(store.get_guild(gid).get("tk_types") or [])
+        next_id = max([int(t.get("id", 0)) for t in types], default=0) + 1
         cat = request.form.get("category_id", "").strip()
-        role = request.form.get("role_id", "").strip()
-        store.set_guild_value(gid, "support_category_id", int(cat) if cat.isdigit() else None)
-        store.set_guild_value(gid, "support_role_id", int(role) if role.isdigit() else None)
+        role_ids = [int(x) for x in request.form.getlist("roles") if x.isdigit()]
+        types.append({
+            "id": next_id,
+            "label": (request.form.get("label", "").strip() or "Tichet"),
+            "emoji": request.form.get("emoji", "").strip(),
+            "style": request.form.get("style", "primary"),
+            "color": request.form.get("color", "#5865f2").strip(),
+            "category_id": int(cat) if cat.isdigit() else None,
+            "roles": role_ids,
+            "open_msg": request.form.get("open_msg", "").strip(),
+            "close": request.form.get("close") == "on",
+            "close_reason": request.form.get("close_reason") == "on",
+            "claim": request.form.get("claim") == "on",
+            "one_per": request.form.get("one_per") == "on",
+            "ping": request.form.get("ping") == "on",
+        })
+        store.set_guild_value(gid, "tk_types", types)
+    return redirect(url_for("support_page"))
+
+
+@app.route("/support/type/delete", methods=["POST"])
+def support_type_delete():
+    gid = store.first_guild_id()
+    tid = request.form.get("id", "")
+    if gid and tid:
+        types = [t for t in (store.get_guild(gid).get("tk_types") or [])
+                 if str(t.get("id")) != str(tid)]
+        store.set_guild_value(gid, "tk_types", types)
     return redirect(url_for("support_page"))
 
 
@@ -170,9 +214,10 @@ COMMANDS = [
         ("/promoter remove", "membru", "Scoate un promoter: șterge canalul și rolul."),
         ("/promoter regenereaza", "", "Repostează clasamentul."),
     ]),
-    ("Suport / Cereri (admin)", [
-        ("/support setup", "canal rol categorie", "Configurează suportul și postează panoul (Suport / Cerere)."),
-        ("/support panel", "", "Repostează panoul de suport."),
+    ("Tichete suport (admin)", [
+        ("/ticket_panel", "", "Postează panoul de tichete în canalul curent (după ce ai configurat tipuri din dashboard)."),
+        ("/add", "membru", "Adaugă un membru în tichetul curent."),
+        ("/remove", "membru", "Scoate un membru din tichetul curent."),
     ]),
     ("Bun venit / Rămas bun", [
         ("(fără comenzi)", "", "Se configurează din paginile Bun venit și Rămas bun ale dashboard-ului."),

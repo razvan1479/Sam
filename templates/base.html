@@ -12,16 +12,23 @@
       <div class="brand"><span>Sam</span></div>
       <nav class="nav">
         <a href="{{ url_for('overview') }}" class="{{ 'active' if active=='overview' }}">Overview</a>
+
+        <div class="nav-section">Market</div>
         <a href="{{ url_for('announcements') }}" class="{{ 'active' if active=='announcements' }}">Anunțuri</a>
         <a href="{{ url_for('tickets') }}" class="{{ 'active' if active=='tickets' }}">Tickete</a>
         <a href="{{ url_for('blacklist') }}" class="{{ 'active' if active=='blacklist' }}">Blacklist</a>
-        <a href="{{ url_for('logs') }}" class="{{ 'active' if active=='logs' }}">Loguri</a>
-        <a href="{{ url_for('support_page') }}" class="{{ 'active' if active=='support' }}">Suport</a>
-        <a href="{{ url_for('commands') }}" class="{{ 'active' if active=='commands' }}">Comenzi</a>
-        <a href="{{ url_for('logout') }}" style="margin-left:auto">Deconectare</a>
+
+        <div class="nav-section">Comunitate</div>
         <a href="{{ url_for('calendar') }}" class="{{ 'active' if active=='calendar' }}">Calendar</a>
+        <a href="{{ url_for('support_page') }}" class="{{ 'active' if active=='support' }}">Suport</a>
         <a href="{{ url_for('welcome_page') }}" class="{{ 'active' if active=='welcome' }}">Bun venit</a>
         <a href="{{ url_for('goodbye_page') }}" class="{{ 'active' if active=='goodbye' }}">Rămas bun</a>
+
+        <div class="nav-section">General</div>
+        <a href="{{ url_for('logs') }}" class="{{ 'active' if active=='logs' }}">Loguri</a>
+        <a href="{{ url_for('commands') }}" class="{{ 'active' if active=='commands' }}">Comenzi</a>
+
+        <a href="{{ url_for('logout') }}" class="nav-logout">Deconectare</a>
       </nav>
     </aside>
     <main class="content">

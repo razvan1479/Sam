@@ -1,53 +1,120 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Suport & Cereri</h1>
+<h1>Tichete (Suport)</h1>
 
-<h3>Setări</h3>
-<form method="post" action="{{ url_for('support_settings') }}" class="cal-settings">
-  <label>Categorie</label>
-  {% if categories %}
-  <select name="category_id">
-    <option value="">— alege —</option>
-    {% for cid, cname in categories %}
-    <option value="{{ cid }}" {{ 'selected' if cid == support_category_id }}>{{ cname }}</option>
-    {% endfor %}
-  </select>
-  {% else %}
-  <input type="text" name="category_id" value="{{ support_category_id or '' }}" placeholder="ID categorie">
-  {% endif %}
-  <label>Rol suport</label>
-  {% if roles %}
-  <select name="role_id">
-    <option value="">— alege —</option>
-    {% for rid, rname in roles %}
-    <option value="{{ rid }}" {{ 'selected' if rid == support_role_id }}>{{ rname }}</option>
-    {% endfor %}
-  </select>
-  {% else %}
-  <input type="text" name="role_id" value="{{ support_role_id or '' }}" placeholder="ID rol">
-  {% endif %}
-  <button class="btn-accent">Salvează</button>
+<h3>Panou</h3>
+<form method="post" action="{{ url_for('support_panel_save') }}" class="greeting-form">
+  <label class="fld">Titlu
+    <input type="text" name="title" value="{{ panel.get('title') or '' }}" placeholder="🎫 Deschide un tichet">
+  </label>
+  <label class="fld">Descriere
+    <textarea name="description" rows="2" placeholder="Alege tipul de tichet...">{{ panel.get('description') or '' }}</textarea>
+  </label>
+  <label class="fld">Culoare
+    <input type="color" name="color" value="{{ panel.get('color') or '#5865f2' }}">
+  </label>
+  <label class="fld">Banner (URL imagine, opțional)
+    <input type="text" name="banner" value="{{ panel.get('banner') or '' }}" placeholder="https://...">
+  </label>
+  <label class="fld">Thumbnail (URL, opțional)
+    <input type="text" name="thumbnail" value="{{ panel.get('thumbnail') or '' }}" placeholder="https://...">
+  </label>
+  <label class="fld">Canal loguri (transcript la închidere)
+    {% if channels %}
+    <select name="log_channel_id">
+      <option value="">— fără —</option>
+      {% for cid, cname in channels %}
+      <option value="{{ cid }}" {{ 'selected' if cid == log_channel_id }}># {{ cname }}</option>
+      {% endfor %}
+    </select>
+    {% else %}
+    <input type="text" name="log_channel_id" value="{{ log_channel_id or '' }}" placeholder="ID canal">
+    {% endif %}
+  </label>
+  <button class="btn-accent">Salvează panoul</button>
 </form>
-<p class="hint">Panoul se postează cu <code>/support setup</code>. Tichetele noi se creează în categoria aleasă.</p>
+<p class="hint">După ce salvezi și adaugi tipuri, postează panoul cu <code>/ticket_panel</code> în canalul dorit.</p>
 
-<h3 style="margin-top:24px">Tichete</h3>
+<h3 style="margin-top:26px">Tipuri de tichete</h3>
+{% if types %}
+<table>
+  <tr><th>Buton</th><th>Categorie</th><th>Roluri</th><th>Butoane</th><th></th></tr>
+  {% for t in types %}
+  <tr>
+    <td>{{ t.emoji }} {{ t.label }}</td>
+    <td class="small">{{ t.category_id or '—' }}</td>
+    <td class="small">{{ t.roles|length }} rol(uri)</td>
+    <td class="small">
+      {{ '🔒' if t.close }} {{ '📝' if t.close_reason }} {{ '🙋' if t.claim }}
+      {{ '· 1/pers' if t.one_per }} {{ '· ping' if t.ping }}
+    </td>
+    <td>
+      <form method="post" action="{{ url_for('support_type_delete') }}"
+            onsubmit="return confirm('Ștergi tipul „{{ t.label }}”?');">
+        <input type="hidden" name="id" value="{{ t.id }}">
+        <button class="btn-danger">Șterge</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="empty">Niciun tip de tichet. Adaugă unul mai jos.</div>
+{% endif %}
+
+<h3 style="margin-top:22px">Adaugă tip</h3>
+<form method="post" action="{{ url_for('support_type_add') }}" class="greeting-form">
+  <label class="fld">Nume pe buton
+    <input type="text" name="label" placeholder="Suport" required>
+  </label>
+  <label class="fld">Emoji (opțional)
+    <input type="text" name="emoji" placeholder="🛠️">
+  </label>
+  <label class="fld">Culoare buton
+    <select name="style">
+      <option value="primary">Albastru</option>
+      <option value="secondary">Gri</option>
+      <option value="success">Verde</option>
+      <option value="danger">Roșu</option>
+    </select>
+  </label>
+  <label class="fld">Categorie
+    {% if categories %}
+    <select name="category_id">
+      <option value="">— alege —</option>
+      {% for cid, cname in categories %}<option value="{{ cid }}">{{ cname }}</option>{% endfor %}
+    </select>
+    {% else %}<input type="text" name="category_id" placeholder="ID categorie">{% endif %}
+  </label>
+  <label class="fld">Roluri suport (Ctrl+click pentru mai multe)
+    {% if roles %}
+    <select name="roles" multiple size="5">
+      {% for rid, rname in roles %}<option value="{{ rid }}">{{ rname }}</option>{% endfor %}
+    </select>
+    {% else %}<input type="text" name="roles" placeholder="ID rol">{% endif %}
+  </label>
+  <label class="fld">Mesaj de deschidere ({user}, {server})
+    <textarea name="open_msg" rows="2" placeholder="Bun venit, {user}! Cu ce te putem ajuta?"></textarea>
+  </label>
+  <label class="row"><input type="checkbox" name="close" checked> <span>🔒 Buton Închide</span></label>
+  <label class="row"><input type="checkbox" name="close_reason"> <span>📝 Buton Închide cu motiv</span></label>
+  <label class="row"><input type="checkbox" name="claim"> <span>🙋 Buton Revendică</span></label>
+  <label class="row"><input type="checkbox" name="one_per" checked> <span>Un singur tichet de acest tip / persoană</span></label>
+  <label class="row"><input type="checkbox" name="ping"> <span>Ping la rolurile de suport la deschidere</span></label>
+  <button class="btn-accent">Adaugă tip</button>
+</form>
+
+<h3 style="margin-top:26px">Tichete deschise</h3>
 {% if rows %}
 <table>
   <tr><th>ID</th><th>User</th><th>Tip</th><th>Status</th><th class="small">Creat</th></tr>
   {% for t in rows %}
   <tr>
-    <td>#{{ t.id }}</td>
-    <td class="small">{{ t.user_id }}</td>
-    <td>{{ t.kind }}</td>
-    <td>
-      {% if t.status == 'open' %}<span class="badge green">deschis</span>
-      {% else %}<span class="badge grey">închis</span>{% endif %}
-    </td>
+    <td>#{{ t.id }}</td><td class="small">{{ t.user_id }}</td><td>{{ t.kind }}</td>
+    <td>{% if t.status == 'open' %}<span class="badge green">deschis</span>{% else %}<span class="badge grey">închis</span>{% endif %}</td>
     <td class="small">{{ t.created_at|dt }}</td>
   </tr>
   {% endfor %}
 </table>
-{% else %}
-<div class="empty">Niciun tichet de suport.</div>
-{% endif %}
+{% else %}<div class="empty">Niciun tichet.</div>{% endif %}
 {% endblock %}
