@@ -171,21 +171,20 @@ def build_tiers(promoters):
 
 
 def build_tier_embed(guild, name, emoji, color, chunk, start):
-    # nume în text normal, iar ❤️/💔 într-un bloc monospace aliniat pe coloane
-    names = []
-    scores = []
+    # tot clasamentul într-un SINGUR bloc monospace → coloane aliniate perfect
+    entries = []
     for j, p in enumerate(chunk):
-        rank = start + j + 1
-        names.append(f"**{rank}.**  {_display_name(guild, p)}")
-        scores.append((p["likes"], p["dislikes"]))
-    # lățimea maximă a like-urilor ca să stea totul aliniat
-    w_like = max((len(str(l)) for l, _ in scores), default=1)
+        entries.append((start + j + 1, _display_name(guild, p), p["likes"], p["dislikes"]))
+    name_w = min(max((len(e[1]) for e in entries), default=4), 16)
+    like_w = max((len(str(e[2])) for e in entries), default=1)
+    dis_w = max((len(str(e[3])) for e in entries), default=1)
     lines = []
-    for nm, (l, d) in zip(names, scores):
-        block = f"`❤️ {str(l).rjust(w_like)}  │  💔 {d}`"
-        lines.append(f"{nm}\u2002\u2002{block}")
-    return discord.Embed(title=f"{emoji}  {name}", description="\n".join(lines),
-                         color=discord.Color(color))
+    for rank, nm, l, d in entries:
+        nm2 = (nm[:name_w - 1] + "…") if len(nm) > name_w else nm.ljust(name_w)
+        rank_col = f"{str(rank) + '.':<4}"
+        lines.append(f"{rank_col}{nm2}   ❤️ {str(l).rjust(like_w)}   💔 {str(d).rjust(dis_w)}")
+    desc = "```\n" + "\n".join(lines) + "\n```"
+    return discord.Embed(title=f"{emoji}  {name}", description=desc, color=discord.Color(color))
 
 
 def build_tier_view(guild, chunk, start):
