@@ -337,44 +337,67 @@ class Leaderboard(commands.Cog):
     )
 
     @group.command(name="create", description="Creează/actualizează un board (clasament)")
-    @app_commands.describe(nume="Numele board-ului (ex. Developeri)", canal="Canalul clasamentului",
-                           rol="Rolul acordat membrilor", categorie="Categoria canalelor (opțional)")
-    async def create_cmd(self, interaction: discord.Interaction, nume: str,
-                         canal: discord.TextChannel, rol: discord.Role,
-                         categorie: discord.CategoryChannel = None):
+    @app_commands.describe(nume="Numele board-ului (ex. Developeri)",
+                           rol="Rolul acordat membrilor",
+                           categorie="Secțiunea board-ului (aici se creează canalele)",
+                           canal="Canalul clasamentului (opțional — dacă lipsește, îl creez eu)")
+    async def create_cmd(self, interaction: discord.Interaction, nume: str, rol: discord.Role,
+                         categorie: discord.CategoryChannel = None,
+                         canal: discord.TextChannel = None):
         gid = interaction.guild_id
+        guild = interaction.guild
         slug = slugify(nume)
         boards = get_boards(gid)
         existing = next((b for b in boards if b["slug"] == slug), None)
-        data = {"slug": slug, "name": nume, "channel_id": canal.id, "role_id": rol.id,
+        await interaction.response.defer(ephemeral=True)
+
+        # canalul clasamentului: dat de user, altfel refolosit, altfel creat automat
+        channel = canal
+        if channel is None and existing and existing.get("channel_id"):
+            channel = guild.get_channel(existing["channel_id"])
+        if channel is None:
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(view_channel=True, send_messages=False),
+                guild.me: discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True, manage_channels=True, read_message_history=True),
+            }
+            try:
+                channel = await guild.create_text_channel(
+                    name=f"clasament-{slug}", overwrites=overwrites, category=categorie,
+                    reason=f"canal clasament {nume}")
+            except discord.Forbidden:
+                await interaction.followup.send("❌ Nu am permisiunea «Manage Channels».", ephemeral=True)
+                return
+
+        data = {"slug": slug, "name": nume, "channel_id": channel.id, "role_id": rol.id,
                 "category_id": categorie.id if categorie else None}
         if existing:
             existing.update(data)
         else:
             boards.append(data)
         save_boards(gid, boards)
-        await interaction.response.defer(ephemeral=True)
-        await self.regenerate_leaderboard(interaction.guild, slug)
+        await self.regenerate_leaderboard(guild, slug)
         await interaction.followup.send(
-            f"✅ Board **{nume}** setat în {canal.mention}, rol {rol.mention}.", ephemeral=True)
+            f"✅ Board **{nume}** gata. Clasament în {channel.mention}, rol {rol.mention}"
+            + (f", secțiune **{categorie.name}**." if categorie else "."), ephemeral=True)
 
-    @group.command(name="add", description="Adaugă un membru într-un board (creează canal + rol)")
-    @app_commands.describe(board="Board-ul", membru="Membrul de adăugat")
-    @app_commands.autocomplete(board=board_autocomplete)
-    async def add_cmd(self, interaction: discord.Interaction, board: str, membru: discord.Member):
+    # helper comun folosit de comanda generică și de cele dedicate
+    async def _add_member(self, interaction: discord.Interaction, board_slug: str,
+                          membru: discord.Member, categorie=None):
         gid = interaction.guild_id
-        b = get_board(gid, board)
+        guild = interaction.guild
+        b = get_board(gid, board_slug)
         if not b:
             await interaction.response.send_message(
-                "❌ Board inexistent. Vezi `/leaderboard list`.", ephemeral=True)
+                f"❌ Board-ul „{board_slug}” nu există încă. Creează-l întâi cu "
+                f"`/leaderboard create`.", ephemeral=True)
             return
-        if db.get_promoter_by_user(gid, board, membru.id):
+        if db.get_promoter_by_user(gid, board_slug, membru.id):
             await interaction.response.send_message(
                 f"❌ {membru.mention} e deja în **{b['name']}**.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
-        guild = interaction.guild
-        category = guild.get_channel(b["category_id"]) if b.get("category_id") else None
+        cat = categorie or (guild.get_channel(b["category_id"]) if b.get("category_id") else None)
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             membru: discord.PermissionOverwrite(
@@ -384,7 +407,7 @@ class Leaderboard(commands.Cog):
         }
         try:
             channel = await guild.create_text_channel(
-                name=f"{board}-{membru.name}", overwrites=overwrites, category=category,
+                name=f"{board_slug}-{membru.name}", overwrites=overwrites, category=cat,
                 reason=f"canal {b['name']}")
         except discord.Forbidden:
             await interaction.followup.send("❌ Nu am permisiunea «Manage Channels».", ephemeral=True)
@@ -395,10 +418,19 @@ class Leaderboard(commands.Cog):
                 await membru.add_roles(role, reason=b["name"])
             except discord.Forbidden:
                 pass
-        db.add_promoter(gid, board, membru.id, membru.display_name, channel.id)
-        await self.refresh_leaderboard(guild, board)
+        db.add_promoter(gid, board_slug, membru.id, membru.display_name, channel.id)
+        await self.refresh_leaderboard(guild, board_slug)
         await interaction.followup.send(
-            f"✅ {membru.mention} adăugat în **{b['name']}**. Canal: {channel.mention}.", ephemeral=True)
+            f"✅ {membru.mention} adăugat în **{b['name']}**. Canal privat: {channel.mention}.",
+            ephemeral=True)
+
+    @group.command(name="add", description="Adaugă un membru într-un board (creează canal + rol)")
+    @app_commands.describe(board="Board-ul", membru="Membrul de adăugat",
+                           categorie="Secțiunea unde se creează canalul (opțional)")
+    @app_commands.autocomplete(board=board_autocomplete)
+    async def add_cmd(self, interaction: discord.Interaction, board: str, membru: discord.Member,
+                      categorie: discord.CategoryChannel = None):
+        await self._add_member(interaction, board, membru, categorie)
 
     @group.command(name="remove", description="Scoate un membru dintr-un board (șterge canal + rol)")
     @app_commands.describe(board="Board-ul", membru="Membrul de scos")
@@ -475,6 +507,47 @@ class Leaderboard(commands.Cog):
             n = len(db.list_promoters_sorted(interaction.guild_id, b["slug"]))
             lines.append(f"• **{b['name']}** (`{b['slug']}`) — {n} membri")
         await interaction.response.send_message("\n".join(lines), ephemeral=True)
+
+    # ---- comenzi dedicate (scurtături pentru board-urile principale) ----
+    @app_commands.command(name="promoter_add", description="Adaugă un promoter (canal privat + rol)")
+    @app_commands.describe(membru="Cine devine promoter",
+                           categorie="Secțiunea unde i se creează canalul (opțional)")
+    @app_commands.default_permissions(administrator=True)
+    async def promoter_add(self, interaction: discord.Interaction, membru: discord.Member,
+                           categorie: discord.CategoryChannel = None):
+        await self._add_member(interaction, "promoteri", membru, categorie)
+
+    @app_commands.command(name="tehnician_add", description="Adaugă un tehnician (canal privat + rol)")
+    @app_commands.describe(membru="Cine devine tehnician",
+                           categorie="Secțiunea unde i se creează canalul (opțional)")
+    @app_commands.default_permissions(administrator=True)
+    async def tehnician_add(self, interaction: discord.Interaction, membru: discord.Member,
+                            categorie: discord.CategoryChannel = None):
+        await self._add_member(interaction, "tehnicieni", membru, categorie)
+
+    @app_commands.command(name="developer_add", description="Adaugă un developer (canal privat + rol)")
+    @app_commands.describe(membru="Cine devine developer",
+                           categorie="Secțiunea unde i se creează canalul (opțional)")
+    @app_commands.default_permissions(administrator=True)
+    async def developer_add(self, interaction: discord.Interaction, membru: discord.Member,
+                            categorie: discord.CategoryChannel = None):
+        await self._add_member(interaction, "developeri", membru, categorie)
+
+    @app_commands.command(name="gfx_add", description="Adaugă un GFX (canal privat + rol)")
+    @app_commands.describe(membru="Cine devine GFX",
+                           categorie="Secțiunea unde i se creează canalul (opțional)")
+    @app_commands.default_permissions(administrator=True)
+    async def gfx_add(self, interaction: discord.Interaction, membru: discord.Member,
+                      categorie: discord.CategoryChannel = None):
+        await self._add_member(interaction, "gfx", membru, categorie)
+
+    @app_commands.command(name="manager_add", description="Adaugă un Discord Manager (canal privat + rol)")
+    @app_commands.describe(membru="Cine devine manager",
+                           categorie="Secțiunea unde i se creează canalul (opțional)")
+    @app_commands.default_permissions(administrator=True)
+    async def manager_add(self, interaction: discord.Interaction, membru: discord.Member,
+                          categorie: discord.CategoryChannel = None):
+        await self._add_member(interaction, "discord-manager", membru, categorie)
 
 
 async def setup(bot: commands.Bot):
