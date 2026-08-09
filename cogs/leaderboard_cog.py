@@ -23,7 +23,8 @@ _vote_cd: dict[int, float] = {}   # user_id -> ultimul vot (în memorie)
 
 
 def render_row(rank: int, name: str, likes: int, dislikes: int) -> str:
-    return f"#{rank}  **{name}**   👍 {likes} | 👎 {dislikes}"
+    medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, f"#{rank}")
+    return f"{medal}  **{name}**   ❤️ {likes} | 💔 {dislikes}"
 
 
 async def _revoke_later(channel: discord.TextChannel, member: discord.Member, secs: int):
