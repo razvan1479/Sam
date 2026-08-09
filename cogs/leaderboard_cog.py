@@ -171,10 +171,19 @@ def build_tiers(promoters):
 
 
 def build_tier_embed(guild, name, emoji, color, chunk, start):
-    lines = []
+    # nume în text normal, iar ❤️/💔 într-un bloc monospace aliniat pe coloane
+    names = []
+    scores = []
     for j, p in enumerate(chunk):
         rank = start + j + 1
-        lines.append(f"**{rank}.**  {_display_name(guild, p)}   —   ❤️ {p['likes']} | 💔 {p['dislikes']}")
+        names.append(f"**{rank}.**  {_display_name(guild, p)}")
+        scores.append((p["likes"], p["dislikes"]))
+    # lățimea maximă a like-urilor ca să stea totul aliniat
+    w_like = max((len(str(l)) for l, _ in scores), default=1)
+    lines = []
+    for nm, (l, d) in zip(names, scores):
+        block = f"`❤️ {str(l).rjust(w_like)}  │  💔 {d}`"
+        lines.append(f"{nm}\u2002\u2002{block}")
     return discord.Embed(title=f"{emoji}  {name}", description="\n".join(lines),
                          color=discord.Color(color))
 
