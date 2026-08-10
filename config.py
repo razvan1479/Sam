@@ -307,3 +307,27 @@ TK_ALREADY_OPEN = "❌ Ai deja un tichet deschis de acest tip."
 TK_CREATED     = "✅ Tichet deschis: {channel}"
 TK_ONLY_STAFF  = "❌ Doar staff-ul sau cel care a deschis tichetul poate face asta."
 TK_NO_TYPES    = "❌ Nu e configurat niciun tip de tichet. Adaugă din dashboard (pagina Suport)."
+
+
+# ---- Șoaptă în ticket (mesaj doar către o parte) ----
+RELAY_WHISPER_SELLER = "Trimis DOAR vânzătorului"
+RELAY_WHISPER_BUYER  = "Trimis DOAR cumpărătorului"
+RELAY_WHISPER_NO_SELLER = "⚠️ Vânzătorul n-a acceptat încă — nu are cui ajunge mesajul."
+TICKET_WHISPER_HINT = (
+    "🔒 **Mesaje private:** scrie `/v mesajul tău` ca să ajungă **doar la vânzător**, "
+    "sau `/c mesajul tău` ca să ajungă **doar la cumpărător**. Fără prefix, mesajul ajunge la amândoi."
+)
+
+
+# ---- /i : cumpărătorul/vânzătorul îi scriu DOAR intermediarului ----
+RELAY_TO_STAFF_FROM_BUYER  = "🔒 Cumpărător → doar către tine"
+RELAY_TO_STAFF_FROM_SELLER = "🔒 Vânzător → doar către tine"
+DM_STAFF_SENT   = "🔒 Trimis doar intermediarului."
+DM_ONLY_STAFF   = "❌ `/v` și `/c` sunt doar pentru intermediar. Ca să-mi scrii **doar mie**, folosește `/i mesajul tău`."
+DM_HOWTO = (
+    "\n\n💬 **Cum comunici aici:**\n"
+    "• Ce scrii **normal** ajunge la cealaltă parte — rămâi complet anonim.\n"
+    "• Ca să-mi scrii **doar mie (intermediarului)**, pune `/i ` la începutul mesajului.\n"
+    "   Exemplu: `/i am o întrebare doar pentru tine`\n"
+    "Doar mesajele cu `/i` ajung strict la mine; cealaltă parte nu le vede."
+)

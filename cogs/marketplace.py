@@ -69,6 +69,18 @@ def _relay_body(message: discord.Message) -> str:
     return body
 
 
+def _prefix_body(content: str, prefix: str):
+    """Dacă textul începe cu `prefix` (ex. '/v') urmat de spațiu (sau e exact prefixul),
+    întoarce restul mesajului; altfel None. Nu declanșează pe cuvinte ca '/version'."""
+    stripped = (content or "").lstrip()
+    low = stripped.lower()
+    if low == prefix:
+        return ""
+    if low.startswith(prefix + " "):
+        return stripped[len(prefix):].lstrip()
+    return None
+
+
 def build_dm_embed(buyer, ann_id: int, ticket_id: int, stats: dict) -> discord.Embed:
     """Embed-ul trimis autorului când cineva îi contactează anunțul.
     ANONIM: nu arată cine e cumpărătorul — doar reputația lui obiectivă."""
@@ -240,6 +252,7 @@ class ContactButton(discord.ui.DynamicItem[discord.ui.Button],
         ping = inter_role.mention if inter_role else ""
         await channel.send((ping + "\n" if ping else "") + config.TICKET_WELCOME.format(ann_id=self.ann_id))
         await channel.send(config.TICKET_CONTROLS_HINT, view=make_ticket_controls_view(ticket_id))
+        await channel.send(config.TICKET_WHISPER_HINT)
 
         # --- DM către autor ---
         stats = db.get_user_stats(guild.id, buyer.id)
@@ -269,7 +282,7 @@ class ContactButton(discord.ui.DynamicItem[discord.ui.Button],
         # --- DM de instrucțiuni către cumpărător (releu anonim) ---
         buyer_dm_ok = True
         try:
-            await buyer.send(config.MSG_BUYER_RELAY_INFO.format(ann_id=self.ann_id))
+            await buyer.send(config.MSG_BUYER_RELAY_INFO.format(ann_id=self.ann_id) + config.DM_HOWTO)
         except discord.Forbidden:
             buyer_dm_ok = False
 
@@ -497,7 +510,7 @@ class AcceptButton(discord.ui.DynamicItem[discord.ui.Button],
                          {"Ticket": f"#{self.ticket_id}", "Autor": interaction.user.mention},
                          color=config.COLOR_PRIMARY)
 
-        await interaction.response.send_message(config.MSG_ACCEPTED_AUTHOR)
+        await interaction.response.send_message(config.MSG_ACCEPTED_AUTHOR + config.DM_HOWTO)
         try:
             await interaction.message.edit(view=None)  # dezactivează butoanele din DM
         except discord.HTTPException:
@@ -1237,36 +1250,92 @@ class Marketplace(commands.Cog):
         ticket, role = self._find_relay_ticket(message.author.id)
         if not ticket:
             return
-        body = _relay_body(message)
-        if not body:
-            return
         guild = self.bot.get_guild(ticket["guild_id"])
         channel = guild.get_channel(ticket["channel_id"]) if guild else None
 
+        content = message.content or ""
+
+        # /v și /c sunt DOAR pentru intermediar — cumpărătorul/vânzătorul nu pot
+        if _prefix_body(content, "/v") is not None or _prefix_body(content, "/c") is not None:
+            try:
+                await message.author.send(config.DM_ONLY_STAFF)
+            except discord.HTTPException:
+                pass
+            return
+
+        # /i → mesaj DOAR către intermediar (nu ajunge la cealaltă parte)
+        ibody = _prefix_body(content, "/i")
+        if ibody is not None:
+            body = ibody
+            if message.attachments:
+                body = (body + "\n" + "\n".join(a.url for a in message.attachments)).strip()
+            if not body:
+                return
+            if channel is not None:
+                label = (config.RELAY_TO_STAFF_FROM_BUYER if role == "buyer"
+                         else config.RELAY_TO_STAFF_FROM_SELLER)
+                embed = discord.Embed(description=body, color=config.COLOR_WARNING)
+                embed.set_author(name=label)
+                await channel.send(embed=embed)
+            try:
+                await message.author.send(config.DM_STAFF_SENT)
+            except discord.HTTPException:
+                pass
+            return
+
+        # mesaj normal → releu anonim către cealaltă parte + în ticket (ca până acum)
+        body = _relay_body(message)
+        if not body:
+            return
         if role == "buyer":
             label = config.RELAY_BUYER_NAME
-            # către vânzător doar dacă a acceptat (e în discuție)
             if ticket["status"] == "accepted":
                 await self._dm_user(ticket["author_id"], f"**{label}:** {body}")
         else:  # seller
             label = config.RELAY_SELLER_NAME
             await self._dm_user(ticket["buyer_id"], f"**{label}:** {body}")
 
-        # în ticket (îl vede intermediarul)
         if channel is not None:
             embed = discord.Embed(description=body, color=config.COLOR_INFO)
             embed.set_author(name=label)
             await channel.send(embed=embed)
 
     async def _relay_from_ticket(self, message: discord.Message):
-        """Mesaj scris de intermediar în ticket → la ambele părți în DM."""
+        """Intermediar în ticket: `/v mesaj` → doar vânzătorului, `/c mesaj` → doar
+        cumpărătorului, altfel → la amândoi."""
         ticket = db.get_ticket_by_channel(message.channel.id)
         if not ticket or ticket["status"] not in ("open", "accepted"):
             return
-        body = _relay_body(message)
+        raw = message.content or ""
+        vbody = _prefix_body(raw, "/v")
+        cbody = _prefix_body(raw, "/c")
+        if vbody is not None:
+            target, content = "seller", vbody
+        elif cbody is not None:
+            target, content = "buyer", cbody
+        else:
+            target, content = None, raw
+
+        body = content.strip()
+        if message.attachments:
+            body = (body + "\n" + "\n".join(a.url for a in message.attachments)).strip()
         if not body:
             return
         text = f"**{config.RELAY_STAFF_NAME}:** {body}"
+
+        if target == "seller":
+            if ticket["status"] == "accepted":
+                await self._dm_user(ticket["author_id"], text)
+                await message.channel.send(f"🔒 *{config.RELAY_WHISPER_SELLER}*")
+            else:
+                await message.channel.send(config.RELAY_WHISPER_NO_SELLER)
+            return
+        if target == "buyer":
+            await self._dm_user(ticket["buyer_id"], text)
+            await message.channel.send(f"🔒 *{config.RELAY_WHISPER_BUYER}*")
+            return
+
+        # fără prefix → ambii
         await self._dm_user(ticket["buyer_id"], text)
         if ticket["status"] == "accepted":
             await self._dm_user(ticket["author_id"], text)
