@@ -29,20 +29,20 @@ MONTHS_RO_SHORT = ["Ian", "Feb", "Mar", "Apr", "Mai", "Iun",
 # =========================================================
 
 def build_calendar_text(year: int, month: int, highlight_day: int) -> str:
-    """Grila lunii, aliniată pe coloane fixe (fiecare căsuță are 4 caractere).
-    Ziua curentă e în [paranteze]. Se afișează într-un bloc de cod (monospace)."""
+    """Grila lunii, cu fiecare zi CENTRATĂ sub litera coloanei.
+    Ziua curentă e în [paranteze]."""
     weeks = pycalendar.Calendar(firstweekday=0).monthdayscalendar(year, month)
-    header = "".join(d.rjust(4) for d in ["L", "M", "M", "J", "V", "S", "D"])
+    header = "".join(d.center(5) for d in ["L", "M", "M", "J", "V", "S", "D"])
     lines = [header]
     for week in weeks:
         cells = []
         for d in week:
             if d == 0:
-                cells.append(" " * 4)                 # zi din afara lunii
+                cells.append(" " * 5)                 # zi din afara lunii
             elif d == highlight_day:
-                cells.append(f"[{d}]".rjust(4))        # ziua curentă
+                cells.append(f"[{d}]".center(5))       # ziua curentă, centrată
             else:
-                cells.append(str(d).rjust(4))
+                cells.append(str(d).center(5))
         lines.append("".join(cells))
     return "\n".join(lines)
 
@@ -85,11 +85,15 @@ def build_events_section(guild_id: int, today: str) -> str:
     return "\n\n".join(parts)
 
 
-def build_full_content(guild_id: int, now: datetime) -> str:
-    title = f"📅 **{MONTHS_RO[now.month - 1]} {now.year}**"
+def build_calendar_embed(guild_id: int, now: datetime) -> discord.Embed:
     grid = build_calendar_text(now.year, now.month, now.day)
     events = build_events_section(guild_id, now.strftime("%Y-%m-%d"))
-    return f"{title}\n```\n{grid}\n```\n{events}"
+    embed = discord.Embed(
+        title=f"📅 {MONTHS_RO[now.month - 1]} {now.year}",
+        description=f"```\n{grid}\n```\n{events}",
+        color=config.COLOR_INFO,
+    )
+    return embed
 
 
 def build_notification(guild_id: int, today: str) -> str:
@@ -122,7 +126,7 @@ class Calendar(commands.Cog):
             return
 
         now = datetime.now(TZ)
-        content = build_full_content(guild.id, now)
+        embed = build_calendar_embed(guild.id, now)
 
         msg = None
         msg_id = s.get("calendar_message_id")
@@ -133,11 +137,11 @@ class Calendar(commands.Cog):
                 msg = None
 
         if msg is None:
-            msg = await channel.send(content)
+            msg = await channel.send(embed=embed)
             store.set_guild_value(guild.id, "calendar_message_id", msg.id)
         else:
             try:
-                await msg.edit(content=content)
+                await msg.edit(content=None, embed=embed)
             except discord.HTTPException:
                 pass
 
